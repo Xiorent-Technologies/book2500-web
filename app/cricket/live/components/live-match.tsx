@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { VideoStream } from "./video-stream"
+import { toast } from "sonner"
+import { createPrediction, type PredictionData } from "@/lib/api"
+import { updateBalanceFromAPI } from "@/lib/utils"
 
 interface Runner {
     selectionId: number | string
@@ -131,22 +134,54 @@ export default function LiveMatch() {
         }
     }, [])
 
-    const updateUserBalance = async () => {
-        try {
-            if (isBrowser) {
-                const userData = localStorage.getItem("user_data")
-                if (userData) {
-                    const parsedData = JSON.parse(userData)
-                    setUserBalance(parsedData.balance || "0")
-                }
-            }
-        } catch (error) {
-            console.error("Error updating balance:", error)
-        }
-    }
+    // const updateAndStoreBalance = async () => {
+    //     try {
+    //         const profile = await fetchUserProfile()
+    //         if (profile?.balance) {
+    //             const balanceStr = profile.balance.toString()
 
+    //             setUserBalance(balanceStr)
+
+    //             const userData = localStorage.getItem('user_data')
+    //             if (userData) {
+    //                 const parsedData = JSON.parse(userData)
+    //                 parsedData.balance = balanceStr
+    //                 localStorage.setItem('user_data', JSON.stringify(parsedData))
+    //             }
+    //         }
+    //     } catch (error) {
+    //         console.error("Error updating balance:", error)
+    //         toast.error("Failed to update balance")
+    //     }
+    // }
+
+    // Initial balance load from localStorage
     useEffect(() => {
-        updateUserBalance()
+        const userData = localStorage.getItem('user_data')
+        if (userData) {
+            try {
+                const parsedData = JSON.parse(userData)
+                if (parsedData.balance) {
+                    setUserBalance(parsedData.balance)
+                }
+            } catch (error) {
+                console.error("Error parsing user data:", error)
+            }
+        }
+
+        // Set up balance update interval
+        const balanceInterval = setInterval(async () => {
+            try {
+                const newBalance = await updateBalanceFromAPI()
+                if (newBalance) {
+                    setUserBalance(newBalance)
+                }
+            } catch (error) {
+                console.error("Error in balance interval:", error)
+            }
+        }, 5000)
+
+        return () => clearInterval(balanceInterval)
     }, [])
 
     useEffect(() => {
@@ -187,7 +222,7 @@ export default function LiveMatch() {
 
         const token = localStorage.getItem("auth_token")
         if (!token) {
-            alert("Please login to place bets")
+            toast.error("Please login to place bets")
             router.push("/login")
             return
         }
@@ -195,34 +230,75 @@ export default function LiveMatch() {
         setBetError(null)
 
         if (!selectedBet || !selectedOdds || !selectedStake) {
-            setBetError("Please select odds and enter stake amount")
+            toast.error("Please select odds and enter stake amount")
             return
         }
 
         const stakeAmount = Number.parseFloat(selectedStake)
         if (isNaN(stakeAmount) || stakeAmount < MIN_STAKE || stakeAmount > MAX_STAKE) {
-            setBetError(`Stake must be between ${MIN_STAKE} and ${MAX_STAKE}`)
+            toast.error(`Stake must be between ${MIN_STAKE} and ${MAX_STAKE}`)
             return
         }
 
         const currentBalance = Number.parseFloat(userBalance)
         if (isNaN(currentBalance) || currentBalance < stakeAmount) {
-            alert("Insufficient balance. Please add funds to your account.")
+            toast.error("Insufficient balance. Please add funds to your account.")
             return
         }
 
         try {
-            // Simulate bet placement
-            alert(`Bet placed successfully: ${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}`)
-            handleClearStake()
-            setSelectedBet(null)
-            setShowMobileBetForm(false)
+            const betData: PredictionData = {
+                invested_amount: stakeAmount,
+                event_id: eventId!,
+                market_id: marketId!,
+                selection_id: selectedBet.selectionId?.toString() || "",
+                type: "event-odds",
+                is_back: selectedBet.type === 'BACK',
+                ratio: Number(selectedOdds),
+                level: 1,
+                bet_category: selectedBet.section.toLowerCase(),
+                match_name: eventOdds.eventName,
+                runner_name: selectedBet.name
+            }
+
+            const response = await createPrediction(betData)
+
+            if (response.success) {
+                // Update balance in localStorage and state
+                const newBalance = (Number(userBalance) - stakeAmount).toString()
+                const userData = localStorage.getItem('user_data')
+                if (userData) {
+                    const parsedData = JSON.parse(userData)
+                    parsedData.balance = newBalance
+                    localStorage.setItem('user_data', JSON.stringify(parsedData))
+                }
+                setUserBalance(newBalance)
+
+                toast.success("Bet Placed Successfully!", {
+                    description: `${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}`
+                })
+
+                handleClearStake()
+                setSelectedBet(null)
+                setShowMobileBetForm(false)
+            } else {
+                toast.error("Failed to place bet", {
+                    description: response.message || "Please try again"
+                })
+            }
         } catch (error: unknown) {
             if (error instanceof Error) {
-                alert(`Error: ${error.message || "Failed to place bet. Please try again."}`)
+                toast.error("Error placing bet", {
+                    description: error instanceof Error ? error.message : "Please try again"
+                })
             } else {
-                alert("Failed to place bet. Please try again.")
+                toast.error("Error placing bet", {
+                    description: "An unknown error occurred. Please try again"
+                })
             }
+            toast.error("Error placing bet", {
+                description: error instanceof Error ? error.message : "Please try again"
+            })
         }
     }
 
@@ -237,15 +313,19 @@ export default function LiveMatch() {
             let isSuspended = false
 
             if (section === "match" && isMatchRunner(runner)) {
-                isSuspended =
-                    !runner.ex?.availableToBack?.some((item) => item.price > 0) &&
-                    !runner.ex?.availableToLay?.some((item) => item.price > 0)
+                isSuspended = [0, 1, 2].some(index => {
+                    const backOdds = runner.ex?.availableToBack?.[index]?.price ?? 0;
+                    const layOdds = runner.ex?.availableToLay?.[index]?.price ?? 0;
+                    return backOdds <= 0 || layOdds <= 0;
+                });
             } else if (section === "bookmaker" && isBookmakerRunner(runner)) {
-                isSuspended =
-                    (!runner.batb || !runner.batb[0] || runner.batb[0][0] <= 0) &&
-                    (!runner.batl || !runner.batl[0] || runner.batl[0][0] <= 0)
+                isSuspended = [0].some(index => {
+                    const backOdds = runner.batb?.[index]?.[0] ?? 0;
+                    const layOdds = runner.batl?.[index]?.[0] ?? 0;
+                    return backOdds <= 0 || layOdds <= 0;
+                });
             } else if (section === "fancy" && isFancyRunner(runner)) {
-                isSuspended = runner.isSuspended || ((runner.BackPrice1 ?? 0) <= 0 && (runner.LayPrice1 ?? 0) <= 0)
+                isSuspended = runner.BackPrice1 <= 0 || runner.LayPrice1 <= 0;
             }
 
             if (isSuspended) {
@@ -432,15 +512,21 @@ export default function LiveMatch() {
                                     </div>
 
                                     {eventOdds.runners?.map((runner, idx) => {
-                                        // Check if runner is suspended (no valid odds)
-                                        const isSuspended =
-                                            !runner.ex?.availableToBack?.some((item) => item.price > 0) ||
-                                            !runner.ex?.availableToLay?.some((item) => item.price > 0)
+                                        const isSuspended = [0, 1, 2].some(index => {
+                                            const backOdds = runner.ex?.availableToBack?.[index]?.price ?? 0;
+                                            const layOdds = runner.ex?.availableToLay?.[index]?.price ?? 0;
+                                            return backOdds <= 0 || layOdds <= 0;
+                                        });
 
                                         return (
                                             <div key={idx} className="border-b border-purple-900">
                                                 <div className="text-white font-bold pl-4 py-2 bg-[#231439]">{runner.runner}</div>
                                                 <div className="grid grid-cols-6 w-full relative">
+                                                    {isSuspended && (
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                                                            <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
+                                                        </div>
+                                                    )}
                                                     {/* BACK columns (3) */}
                                                     {[2, 1, 0].map((i) => {
                                                         const odds = runner.ex?.availableToBack?.[i]?.price || 0
@@ -451,8 +537,7 @@ export default function LiveMatch() {
                                                             <div
                                                                 key={`back-${i}`}
                                                                 onClick={() => isAvailable && handleOddsClick(runner, "back", "match")}
-                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
-                                                                    } ${i === 0 ? "bg-[#72bbee]" : i === 1 ? "bg-[#72bbee] " : "bg-[#72bbee] "}`}
+                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#72bbee]" : i === 1 ? "bg-[#72bbee] " : "bg-[#72bbee] "}`}
                                                             >
                                                                 <div className="text-white font-bold">{odds > 0 ? odds.toFixed(2) : "0.0"}</div>
                                                                 <div className="text-xs text-gray-200">{size > 0 ? size.toLocaleString() : "0.0"}</div>
@@ -470,21 +555,13 @@ export default function LiveMatch() {
                                                             <div
                                                                 key={`lay-${i}`}
                                                                 onClick={() => isAvailable && handleOddsClick(runner, "lay", "match")}
-                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
-                                                                    } ${i === 0 ? "bg-[#ff9393]" : i === 1 ? "bg-[#ff9393] " : "bg-[#ff9393]"}`}
+                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#ff9393]" : i === 1 ? "bg-[#ff9393] " : "bg-[#ff9393]"}`}
                                                             >
                                                                 <div className="text-white font-bold">{odds > 0 ? odds.toFixed(2) : "0.0"}</div>
                                                                 <div className="text-xs text-gray-200">{size > 0 ? size.toLocaleString() : "0.0"}</div>
                                                             </div>
                                                         )
                                                     })}
-
-                                                    {/* Suspended overlay */}
-                                                    {isSuspended && (
-                                                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
-                                                            <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         )
@@ -505,7 +582,9 @@ export default function LiveMatch() {
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">CASHOUT</div>
-                                    <div className="text-white text-xs hidden sm:block">Min: 100 | Max: 250K</div>
+                                    <div className="text-white text-xs hidden sm:block">
+                                        Min: {bookmakerMarket?.min || "100"} | Max: {bookmakerMarket?.max || "250K"}
+                                    </div>
                                     <div className="text-white">{expandedSections.bookmaker ? "▲" : "▼"}</div>
                                 </div>
                             </div>
@@ -522,74 +601,56 @@ export default function LiveMatch() {
                                     </div>
 
                                     {(bookmakerMarket?.runners || []).map((runner, idx) => {
-                                        // Check if runner is suspended (no valid odds)
-                                        const isSuspended =
-                                            (!runner.batb || !runner.batb[0] || runner.batb[0][0] <= 0) &&
-                                            (!runner.batl || !runner.batl[0] || runner.batl[0][0] <= 0)
+                                        const isSuspended = runner.status === "SUSPENDED" || !runner.batb?.[0]?.[0] || !runner.batl?.[0]?.[0];
 
                                         return (
                                             <div key={idx} className="border-b border-purple-900">
-                                                <div className="text-white font-bold pl-4 py-2 bg-[#231439]">{runner.runnerName}</div>
-                                                <div className="grid grid-cols-2 w-full relative">
-                                                    {/* BACK column */}
-                                                    <div
-                                                        onClick={() =>
-                                                            !isSuspended &&
-                                                            runner.batb?.[0]?.[0] > 0 &&
-                                                            handleOddsClick(
-                                                                {
-                                                                    ...runner,
-                                                                    runner: runner.runnerName // Add missing runner property
-                                                                },
-                                                                "back",
-                                                                "bookmaker"
-                                                            )
-                                                        }
-                                                        className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 ${!isSuspended && runner.batb?.[0]?.[0] > 0 ? "cursor-pointer bg-[#72bbee] border-r-2" : "bg-[#72bbee]"
-                                                            }`}
-                                                    >
-                                                        <div className="text-white font-bold">
-                                                            {runner.batb?.[0]?.[0] > 0 ? runner.batb[0][0] : "0.0"}
+                                                <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
+                                                    {runner.runnerName}
+                                                </div>
+                                                <div className="grid grid-cols-6 w-full relative">
+                                                    {/* Back columns (3) */}
+                                                    {[2, 1, 0].map((i) => (
+                                                        <div
+                                                            key={`back-${i}`}
+                                                            onClick={() => !isSuspended && handleOddsClick(runner, "back", "bookmaker")}
+                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
+                                                                ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#72bbee]`}
+                                                        >
+                                                            <div className="font-bold text-black">
+                                                                {runner.batb?.[i]?.[0] || "0.0"}
+                                                            </div>
+                                                            <div className="text-[10px] text-black/75">
+                                                                {(Number(runner.batb?.[i]?.[1] || 0) / 1000).toFixed(1)}K
+                                                            </div>
                                                         </div>
-                                                        <div className="text-xs text-gray-200">
-                                                            {(runner.batb?.[0]?.[1] || 0) > 0 ? runner.batb[0][1].toLocaleString() : "0.0"}
-                                                        </div>
-                                                    </div>
+                                                    ))}
 
-                                                    {/* LAY column */}
-                                                    <div
-                                                        onClick={() =>
-                                                            !isSuspended &&
-                                                            runner.batl?.[0]?.[0] > 0 &&
-                                                            handleOddsClick(
-                                                                {
-                                                                    ...runner,
-                                                                    runner: runner.runnerName // Add missing runner property
-                                                                },
-                                                                "lay",
-                                                                "bookmaker"
-                                                            )
-                                                        }
-                                                        className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 ${!isSuspended && runner.batl?.[0]?.[0] > 0 ? "cursor-pointer bg-[#ff9393] border-r-2" : "bg-[#ff9393]"
-                                                            }`}
-                                                    >
-                                                        <div className="text-white font-bold">
-                                                            {runner.batl?.[0]?.[0] > 0 ? runner.batl[0][0] : "0.0"}
+                                                    {/* Lay columns (3) */}
+                                                    {[0, 1, 2].map((i) => (
+                                                        <div
+                                                            key={`lay-${i}`}
+                                                            onClick={() => !isSuspended && handleOddsClick(runner, "lay", "bookmaker")}
+                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
+                                                                ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#ff9393]`}
+                                                        >
+                                                            <div className="font-bold text-black">
+                                                                {runner.batl?.[i]?.[0] || "0.0"}
+                                                            </div>
+                                                            <div className="text-[10px] text-black/75">
+                                                                {(Number(runner.batl?.[i]?.[1] || 0) / 1000).toFixed(1)}K
+                                                            </div>
                                                         </div>
-                                                        <div className="text-xs text-gray-200">
-                                                            {(runner.batl?.[0]?.[1] || 0) > 0 ? runner.batl[0][1].toLocaleString() : "0.0"}
-                                                        </div>
-                                                    </div>
+                                                    ))}
 
-                                                    {/* Suspended overlay */}
                                                     {isSuspended && (
-                                                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                             <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
-                                        )
+                                        );
                                     })}
                                 </div>
                             )}
@@ -624,8 +685,7 @@ export default function LiveMatch() {
                                     </div>
 
                                     {fancyOdds.map((odd, idx) => {
-                                        // Check if market is suspended
-                                        const isSuspended = odd.isSuspended || (odd.BackPrice1 <= 0 && odd.LayPrice1 <= 0)
+                                        const isSuspended = odd.BackPrice1 <= 0 || odd.LayPrice1 <= 0;
 
                                         return (
                                             <div key={idx} className="border-b border-purple-900 last:border-b-0">
@@ -685,7 +745,7 @@ export default function LiveMatch() {
 
                                                     {/* Suspended overlay */}
                                                     {isSuspended && (
-                                                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                             <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
                                                         </div>
                                                     )}

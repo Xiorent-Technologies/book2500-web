@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Tv } from "lucide-react"
 import Link from "next/link"
@@ -78,6 +78,22 @@ export function MatchList() {
         return () => clearInterval(interval)
     }, [])
 
+    const getFormattedOdds = (runners: Runner[]) => {
+        if (!runners || runners.length < 2) return null;
+
+        const team1 = runners[0];
+        const team2 = runners[1];
+
+        return {
+            team1Back1: team1.ex?.availableToBack?.[0]?.price || '-',
+            team1Lay1: team1.ex?.availableToLay?.[0]?.price || '-',
+            team1Back2: team1.ex?.availableToBack?.[1]?.price || '-',
+            team1Lay2: team1.ex?.availableToLay?.[1]?.price || '-',
+            team2Back1: team2.ex?.availableToBack?.[0]?.price || '-',
+            team2Lay1: team2.ex?.availableToLay?.[0]?.price || '-',
+        };
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col gap-4 p-4">
@@ -128,9 +144,6 @@ export function MatchList() {
                                     })}
                                 </div>
                                 <div className="text-white font-medium">{match.event.name}</div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                    Markets: {match.marketCount} | Country: {match.event.countryCode}
-                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="bg-yellow-400 p-1 rounded">
@@ -140,83 +153,66 @@ export function MatchList() {
                             </div>
                         </div>
 
-                        {/* Market Odds */}
-                        <div className="p-1 rounded overflow-hidden text-xs bg-black/20">
-                            {match.odds && Array.isArray(match.odds.runners) && match.odds.runners.length > 0 ? (
+                        <div className="p-1 rounded overflow-hidden text-xs">
+                            {match.odds?.runners ? (
                                 <>
-                                    <div className="flex justify-between items-center mb-2 px-2">
-                                        <div className="text-[#72bbee] font-bold">BACK</div>
-                                        <div className="text-[#ff9393] font-bold">LAY</div>
-                                    </div>
-                                    {match.odds.runners.map((runner) => {
-                                        // Check if runner is suspended (no valid odds)
-                                        const isSuspended =
-                                            !runner.ex?.availableToBack?.some((item) => item.price > 0) &&
-                                            !runner.ex?.availableToLay?.some((item) => item.price > 0)
+                                    {/* <div className="text-white mb-2 font-medium text-xs px-2">
+                                        {match.odds.runners[0]?.runner}
+                                    </div> */}
+
+                                    {(() => {
+                                        const odds = getFormattedOdds(match.odds.runners);
+                                        if (!odds) return null;
+
+                                        const isSuspended = Object.values(odds).every(odd => odd === '-');
 
                                         return (
-                                            <div key={runner.selectionId} className="mb-2 last:mb-0">
-                                                <div className="text-white mb-1 font-medium text-xs px-2">{runner.runner}</div>
-                                                <div className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""}`}>
-                                                    {/* Back odds */}
-                                                    {[2, 1, 0].map((index) => (
-                                                        <div
-                                                            key={`back-${index}`}
-                                                            className={`bg-[#72bbee] rounded p-2 text-center ${index === 0 ? "bg-[#72bbee]" : index === 1 ? "bg-[#72bbee]" : "bg-[#72bbee]"
-                                                                }`}
-                                                        >
-                                                            {runner.ex?.availableToBack?.[index] ? (
-                                                                <>
-                                                                    <div className="font-bold text-black">
-                                                                        {runner.ex.availableToBack[index].price.toFixed(2)}
-                                                                    </div>
-                                                                    <div className="text-[10px] text-black/75">
-                                                                        {(runner.ex.availableToBack[index].size / 1000).toFixed(1)}K
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <div className="font-bold text-black">0.0</div>
-                                                                    <div className="text-[10px] text-black/75">0.0</div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {/* Lay odds */}
-                                                    {[0, 1, 2].map((index) => (
-                                                        <div
-                                                            key={`lay-${index}`}
-                                                            className={`bg-[#ff9393] rounded p-2 text-center ${index === 0 ? "bg-[#ff9393]" : index === 1 ? "bg-[#ff9393]" : "bg-[#ff9393]"
-                                                                }`}
-                                                        >
-                                                            {runner.ex?.availableToLay?.[index] ? (
-                                                                <>
-                                                                    <div className="font-bold text-black">
-                                                                        {runner.ex.availableToLay[index].price.toFixed(2)}
-                                                                    </div>
-                                                                    <div className="text-[10px] text-black/75">
-                                                                        {(runner.ex.availableToLay[index].size / 1000).toFixed(1)}K
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <div className="font-bold text-black">0.0</div>
-                                                                    <div className="text-[10px] text-black/75">0.0</div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    ))}
-
-                                                    {/* Suspended overlay */}
-                                                    {isSuspended && (
-                                                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
-                                                            <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
-                                                        </div>
-                                                    )}
+                                            <div className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""}`}>
+                                                {/* Team 1 Back 1 */}
+                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team1Back1 === '-' ? '0.0' : Number(odds.team1Back1).toFixed(2)}
+                                                    </div>
                                                 </div>
+                                                {/* Team 1 Lay 1 */}
+                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team1Lay1 === '-' ? '0.0' : Number(odds.team1Lay1).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                {/* Team 1 Back 2 */}
+                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team1Back2 === '-' ? '0.0' : Number(odds.team1Back2).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                {/* Team 1 Lay 2 */}
+                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team1Lay2 === '-' ? '0.0' : Number(odds.team1Lay2).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                {/* Team 2 Back 1 */}
+                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team2Back1 === '-' ? '0.0' : Number(odds.team2Back1).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                {/* Team 2 Lay 1 */}
+                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                    <div className="font-bold text-black">
+                                                        {odds.team2Lay1 === '-' ? '0.0' : Number(odds.team2Lay1).toFixed(2)}
+                                                    </div>
+                                                </div>
+
+                                                {isSuspended && (
+                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                                                        <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )
-                                    })}
+                                        );
+                                    })()}
                                 </>
                             ) : (
                                 <div className="text-center text-gray-400 py-2">No market data available</div>

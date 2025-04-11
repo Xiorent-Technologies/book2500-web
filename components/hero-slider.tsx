@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
@@ -44,29 +44,23 @@ export function HeroSlider() {
         fetchSlides()
     }, [])
 
-    useEffect(() => {
-        if (slides.length === 0) return
-
-        // Start autoplay
-        startAutoPlay()
-
-        return () => {
-            // Clear autoplay on unmount
-            if (autoPlayRef.current) {
-                clearInterval(autoPlayRef.current)
-            }
-        }
+    const startAutoPlay = useCallback(() => {
+        stopAutoPlay()
+        autoPlayRef.current = setInterval(() => {
+            setCurrentSlide((prev) => (prev + 1) % slides.length)
+        }, 3000)
     }, [slides.length])
 
-    const startAutoPlay = () => {
+    const stopAutoPlay = () => {
         if (autoPlayRef.current) {
             clearInterval(autoPlayRef.current)
         }
-
-        autoPlayRef.current = setInterval(() => {
-            setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
-        }, 5000)
     }
+
+    useEffect(() => {
+        startAutoPlay()
+        return () => stopAutoPlay()
+    }, [startAutoPlay])
 
     const goToSlide = (index: number) => {
         setCurrentSlide(index)

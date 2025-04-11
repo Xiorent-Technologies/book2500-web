@@ -1,11 +1,8 @@
-import React from 'react'
-
-const Footer = () => {
+export default function Footer() {
     return (
-        < div className="mt-auto py-4 text-center text-gray-400 text-xs border-t border-purple-900" >
-            copyright vvvvvvvvvv | All rights reserved | Powered by book2500.com
-        </ div>
+        <footer className="w-full bg-brand-darkPurple text-center p-4 text-sm text-gray-400 border-t-2 border-gray-600">
+            <p>copyright vvvvvvvvvvvv| All rights reserved | Powered by book2500.com</p>
+        </footer>
     )
 }
 
-export default Footer

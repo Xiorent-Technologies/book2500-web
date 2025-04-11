@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { HeroSlider } from "@/components/hero-slider"
 
 interface WeeklyLeader {
     user_id: string
@@ -59,7 +60,7 @@ export default function CricketPage() {
     return (
         <div className="flex flex-col min-h-screen bg-[#1E0B38]">
             {/* Cricket Banner */}
-            <div className="relative w-full h-[200px] sm:h-[250px]">
+            {/* <div className="relative w-full h-[200px] sm:h-[250px]">
                 <Image
                     src="/cricket-banner.svg"
                     alt="Cricket Banner"
@@ -67,7 +68,8 @@ export default function CricketPage() {
                     className="object-cover"
                     priority
                 />
-            </div>
+            </div> */}
+            <HeroSlider />
 
             {/* Main Content */}
             <div className="container mx-auto px-4 py-6">

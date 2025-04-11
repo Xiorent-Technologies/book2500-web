@@ -1,0 +1,9 @@
+await BaseClient.safeApiCall(
+      Constants.withdrawPostApiUrl, // url
+      RequestType.post, // request type (get,post,delete,put)
+      headers: {'Authorization': 'Bearer $token'},
+      data: {
+        'amount': amount,
+        'method_id': userId,
+        'detail': accountNumber
+      },
