@@ -463,12 +463,13 @@ export default function LiveMatch() {
                         ) : (
                             <iframe
                                 ref={iframeRef}
-                                src="https://www.satsports.net/score_widget/index.html?id=58145125"
-                                className="w-full h-full border-0"
+                                src="https://www.satsports.net/score_widget/index.html?id=58145129"
+                                className="w-full border-0 overflow-y-hidden"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                                 allowFullScreen
                                 style={{
-                                    minHeight: "300px",
+                                    minHeight: "100px",
+
                                     display: "block",
                                     backgroundColor: "transparent",
                                 }}

@@ -169,37 +169,37 @@ export function MatchList() {
                                         return (
                                             <div className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""}`}>
                                                 {/* Team 1 Back 1 */}
-                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                <div className="bg-[#72bbee] rounded py-4 items-center text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team1Back1 === '-' ? '0.0' : Number(odds.team1Back1).toFixed(2)}
                                                     </div>
                                                 </div>
                                                 {/* Team 1 Lay 1 */}
-                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                <div className="bg-[#ff9393] rounded py-4 text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team1Lay1 === '-' ? '0.0' : Number(odds.team1Lay1).toFixed(2)}
                                                     </div>
                                                 </div>
                                                 {/* Team 1 Back 2 */}
-                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                <div className="bg-[#72bbee] rounded py-4 text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team1Back2 === '-' ? '0.0' : Number(odds.team1Back2).toFixed(2)}
                                                     </div>
                                                 </div>
                                                 {/* Team 1 Lay 2 */}
-                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                <div className="bg-[#ff9393] rounded py-4 text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team1Lay2 === '-' ? '0.0' : Number(odds.team1Lay2).toFixed(2)}
                                                     </div>
                                                 </div>
                                                 {/* Team 2 Back 1 */}
-                                                <div className="bg-[#72bbee] rounded p-2 text-center">
+                                                <div className="bg-[#72bbee] rounded py-4 text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team2Back1 === '-' ? '0.0' : Number(odds.team2Back1).toFixed(2)}
                                                     </div>
                                                 </div>
                                                 {/* Team 2 Lay 1 */}
-                                                <div className="bg-[#ff9393] rounded p-2 text-center">
+                                                <div className="bg-[#ff9393] rounded py-4 text-center">
                                                     <div className="font-bold text-black">
                                                         {odds.team2Lay1 === '-' ? '0.0' : Number(odds.team2Lay1).toFixed(2)}
                                                     </div>

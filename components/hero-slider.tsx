@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
@@ -44,29 +44,34 @@ export function HeroSlider() {
         fetchSlides()
     }, [])
 
-    const startAutoPlay = useCallback(() => {
-        stopAutoPlay()
-        autoPlayRef.current = setInterval(() => {
-            setCurrentSlide((prev) => (prev + 1) % slides.length)
-        }, 3000)
+    useEffect(() => {
+        if (slides.length === 0) return
+
+        // Start autoplay
+        startAutoPlay()
+
+        return () => {
+            // Clear autoplay on unmount
+            if (autoPlayRef.current) {
+                clearInterval(autoPlayRef.current)
+            }
+        }
     }, [slides.length])
 
-    const stopAutoPlay = () => {
+    const startAutoPlay = () => {
         if (autoPlayRef.current) {
             clearInterval(autoPlayRef.current)
         }
+
+        autoPlayRef.current = setInterval(() => {
+            setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
+        }, 5000)
     }
 
-    useEffect(() => {
-        startAutoPlay()
-        return () => stopAutoPlay()
-    }, [startAutoPlay])
-
-    const goToSlide = (index: number) => {
-        setCurrentSlide(index)
-        // Reset autoplay timer when manually changing slides
-        startAutoPlay()
-    }
+    // const goToSlide = (index: number) => {
+    //     setCurrentSlide(index)
+    //     startAutoPlay()
+    // }
 
     const goToPrevSlide = () => {
         setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))
@@ -161,7 +166,7 @@ export function HeroSlider() {
             </button>
 
             {/* Dots navigation */}
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+            {/* <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
                 {slides.map((_, index) => (
                     <button
                         key={index}
@@ -172,7 +177,7 @@ export function HeroSlider() {
                         aria-current={index === currentSlide}
                     />
                 ))}
-            </div>
+            </div> */}
         </div>
     )
 }

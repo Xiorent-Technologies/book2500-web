@@ -99,6 +99,69 @@ body {
   }
 }
 
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translate(100%);
+  }
+
+  100% {
+    transform: translate(-100%);
+  }
+}
+
+@keyframes carousel {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 15s linear infinite;
+}
+
+.sliding-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: slide 20s linear infinite;
+}
+
+.sliding-container {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.carousel-container {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.carousel-content {
+  display: flex;
+  animation: carousel 20s linear infinite;
+  white-space: nowrap;
+  width: max-content;
+}
+
+.carousel-content:hover {
+  animation-play-state: paused;
+}
+
 /* Hero Slider Styles */
 .hero-slider .dot {
   width: 10px;

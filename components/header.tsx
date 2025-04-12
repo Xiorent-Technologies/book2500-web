@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import Link from "next/link"
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { Menu, X, User, LogOut } from "lucide-react"
-import Image from "next/image"
+
 
 // Mock auth context for demonstration
 const useAuth = () => {
@@ -81,8 +82,8 @@ function Header() {
         <header className="sticky top-0 z-50 w-full border-b bg-[#3a1a5e]">
             <div className="container mx-auto flex h-16 items-center justify-between px-4">
                 <Link href="/" className="flex-shrink-0">
-                    <div className="h-8 w-32 flex items-center justify-center text-white font-bold">
-                        <Image src="/logo.svg" alt="Book2500 Logo" width={180} height={60} className="w-auto h-3 sm:h-12" />
+                    <div className="h-16 w-32 flex items-center justify-center">
+                        <img src="/logo.svg" alt="Book2500 Logo" className="h-full w-auto object-contain" />
                     </div>
                 </Link>
 
