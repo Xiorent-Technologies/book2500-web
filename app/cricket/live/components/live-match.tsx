@@ -449,6 +449,7 @@ export default function LiveMatch() {
                             <VideoStream matchId={eventId || "333333"} />
                         ) : (
                             <>
+                                 <VideoStream matchId={eventId || "333333"} />
                                 <div className="overflow-hidden w-full h-[55px] md:h-[50px]">
                                     <iframe
                                         scrolling="no"
@@ -460,7 +461,7 @@ export default function LiveMatch() {
                                         
                                     />
                                 </div>
-                                <VideoStream matchId={eventId || "333333"} />
+                               
                             </>
                         )}
                     </div>
