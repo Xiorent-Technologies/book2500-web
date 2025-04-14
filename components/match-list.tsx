@@ -31,6 +31,7 @@ interface EventData {
         eventName: string
         runners: Runner[]
     }
+    badges?: string[]
 }
 
 // Add this helper function at the top level
@@ -55,8 +56,9 @@ export function MatchList() {
                 const json = await response.json()
                 const data: EventData[] = json.data || []
 
+                // Limit to 5 matches
                 const matchesWithOdds = await Promise.all(
-                    data.slice(0, 4).map(async (match) => {
+                    data.slice(0, 5).map(async (match, index) => {
                         if (!match.marketIds?.length) return match
 
                         const marketId = match.marketIds[0].marketId
@@ -65,10 +67,21 @@ export function MatchList() {
                                 `https://test.book2500.in/fetch-event-odds/${match.event.id}/${marketId}`,
                             )
                             const oddsData = await oddsResponse.json()
-                            return { ...match, odds: oddsData.data }
+
+                            // Add BM and F badges based on index
+                            const badges = ['F']
+                            if (index >= 1 && index <= 3) {
+                                badges.unshift('BM')
+                            }
+
+                            return {
+                                ...match,
+                                odds: oddsData.data,
+                                badges
+                            }
                         } catch (err) {
                             console.error(`Error fetching odds for ${match.event.id}`, err)
-                            return match
+                            return { ...match, badges: ['F'] }
                         }
                     }),
                 )
@@ -134,7 +147,7 @@ export function MatchList() {
 
     return (
         <div className="flex flex-col">
-            {matches.map((match) => (
+            {matches.map((match, matchIndex) => (
                 <Link
                     key={match.event.id}
                     href={`/cricket/live?match=${match.event.id}&market=${match.marketIds[0]?.marketId}`}
@@ -156,77 +169,90 @@ export function MatchList() {
                                 <div className="text-white font-medium">{match.event.name}</div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {isMatchLive(match.event.openDate) && (
+                                    <Badge className="bg-red-500 text-white">LIVE</Badge>
+                                )}
+                                {match.badges?.includes('BM') && (
+                                    <Badge className="bg-green-500 text-white">BM</Badge>
+                                )}
+                                {match.badges?.includes('F') && (
+                                    <Badge className="bg-yellow-500 text-black">F</Badge>
+                                )}
                                 <div className="bg-yellow-400 p-1 rounded">
                                     <Tv size={16} className="text-black" />
                                 </div>
-                                {isMatchLive(match.event.openDate) ? (
-                                    <Badge className="bg-green-500 text-white">LIVE</Badge>
-                                ) : (
-                                    // <Badge className="bg-gray-500 text-white">UPCOMING</Badge>
-                                    <></>
-                                )}
+
                             </div>
                         </div>
 
                         <div className="p-1 rounded overflow-hidden text-xs">
-                            {match.odds?.runners ? (
-                                <>
-                                    {(() => {
-                                        const odds = getFormattedOdds(match.odds.runners);
-                                        if (!odds) return null;
-
-                                        const isSuspended = Object.values(odds).every(odd => odd === '-');
-
-                                        return (
-                                            <div className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""}`}>
-                                                {/* Team 1 Back 1 */}
-                                                <div className="bg-[#72bbee] rounded py-4 items-center text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team1Back1 === '-' ? '0.0' : Number(odds.team1Back1).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                {/* Team 1 Lay 1 */}
-                                                <div className="bg-[#ff9393] rounded py-4 text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team1Lay1 === '-' ? '0.0' : Number(odds.team1Lay1).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                {/* Team 1 Back 2 */}
-                                                <div className="bg-[#72bbee] rounded py-4 text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team1Back2 === '-' ? '0.0' : Number(odds.team1Back2).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                {/* Team 1 Lay 2 */}
-                                                <div className="bg-[#ff9393] rounded py-4 text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team1Lay2 === '-' ? '0.0' : Number(odds.team1Lay2).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                {/* Team 2 Back 1 */}
-                                                <div className="bg-[#72bbee] rounded py-4 text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team2Back1 === '-' ? '0.0' : Number(odds.team2Back1).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                {/* Team 2 Lay 1 */}
-                                                <div className="bg-[#ff9393] rounded py-4 text-center">
-                                                    <div className="font-bold text-black">
-                                                        {odds.team2Lay1 === '-' ? '0.0' : Number(odds.team2Lay1).toFixed(2)}
-                                                    </div>
-                                                </div>
-
-                                                {isSuspended && (
-                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                                                        <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-                                </>
+                            {matchIndex === 0 ? (
+                                // First match - show dashes
+                                <div className="grid grid-cols-6 gap-2">
+                                    {Array(6).fill(null).map((_, index) => (
+                                        <div
+                                            key={index}
+                                            className={`rounded py-4 text-center ${index % 2 === 0 ? "bg-[#72bbee]" : "bg-[#ff9393]"}`}
+                                        >
+                                            <div className="font-bold text-black">-</div>
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
-                                <div className="text-center text-gray-400 py-2">No market data available</div>
+                                // Other matches - show regular odds
+                                match.odds?.runners && (() => {
+                                    const odds = getFormattedOdds(match.odds.runners);
+                                    if (!odds) return null;
+
+                                    const isSuspended = Object.values(odds).every(odd => odd === '-');
+
+                                    return (
+                                        <div className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""}`}>
+                                            {/* Team 1 Back 1 */}
+                                            <div className="bg-[#72bbee] rounded py-4 items-center text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team1Back1 === '-' ? '0.0' : Number(odds.team1Back1).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            {/* Team 1 Lay 1 */}
+                                            <div className="bg-[#ff9393] rounded py-4 text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team1Lay1 === '-' ? '0.0' : Number(odds.team1Lay1).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            {/* Team 1 Back 2 */}
+                                            <div className="bg-[#72bbee] rounded py-4 text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team1Back2 === '-' ? '0.0' : Number(odds.team1Back2).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            {/* Team 1 Lay 2 */}
+                                            <div className="bg-[#ff9393] rounded py-4 text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team1Lay2 === '-' ? '0.0' : Number(odds.team1Lay2).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            {/* Team 2 Back 1 */}
+                                            <div className="bg-[#72bbee] rounded py-4 text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team2Back1 === '-' ? '0.0' : Number(odds.team2Back1).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            {/* Team 2 Lay 1 */}
+                                            <div className="bg-[#ff9393] rounded py-4 text-center">
+                                                <div className="font-bold text-black">
+                                                    {odds.team2Lay1 === '-' ? '0.0' : Number(odds.team2Lay1).toFixed(2)}
+                                                </div>
+                                            </div>
+
+                                            {isSuspended && (
+                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                                                    <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()
                             )}
                         </div>
                     </div>
