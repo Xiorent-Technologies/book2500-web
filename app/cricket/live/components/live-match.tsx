@@ -451,7 +451,7 @@ export default function LiveMatch() {
                         </div>
 
                         {/* Score Container */}
-                        <div className="w-full h-[50px] bg-black/30 rounded-lg overflow-hidden">
+                        <div className="w-full h-[55px] bg-black/30 rounded-lg overflow-hidden">
                             <iframe
                                 ref={iframeRef}
                                 src="https://www.satsports.net/score_widget/index.html?id=58145139"

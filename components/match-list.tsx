@@ -33,6 +33,16 @@ interface EventData {
     }
 }
 
+// Add this helper function at the top level
+function isMatchLive(matchStartTime: string): boolean {
+    const now = new Date();
+    const matchTime = new Date(matchStartTime);
+
+    // Match is considered live if within 8 hours of start time
+    const hoursDifference = (now.getTime() - matchTime.getTime()) / (1000 * 60 * 60);
+    return hoursDifference >= 0 && hoursDifference <= 8;
+}
+
 export function MatchList() {
     const [matches, setMatches] = useState<EventData[]>([])
     const [loading, setLoading] = useState(true)
@@ -149,17 +159,18 @@ export function MatchList() {
                                 <div className="bg-yellow-400 p-1 rounded">
                                     <Tv size={16} className="text-black" />
                                 </div>
-                                <Badge className="bg-green-500 text-white">LIVE</Badge>
+                                {isMatchLive(match.event.openDate) ? (
+                                    <Badge className="bg-green-500 text-white">LIVE</Badge>
+                                ) : (
+                                    // <Badge className="bg-gray-500 text-white">UPCOMING</Badge>
+                                    <></>
+                                )}
                             </div>
                         </div>
 
                         <div className="p-1 rounded overflow-hidden text-xs">
                             {match.odds?.runners ? (
                                 <>
-                                    {/* <div className="text-white mb-2 font-medium text-xs px-2">
-                                        {match.odds.runners[0]?.runner}
-                                    </div> */}
-
                                     {(() => {
                                         const odds = getFormattedOdds(match.odds.runners);
                                         if (!odds) return null;
