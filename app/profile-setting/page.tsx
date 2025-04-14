@@ -50,8 +50,8 @@ export default function ProfileSettingPage() {
                 return
             }
 
-            setUserData(JSON.parse(storedUserData))
             const parsedData = JSON.parse(storedUserData)
+            setUserData(parsedData)
             setFormData({
                 name: parsedData.name || '',
                 email: parsedData.email || '',
@@ -67,14 +67,21 @@ export default function ProfileSettingPage() {
 
         // Set up balance update interval
         const balanceInterval = setInterval(async () => {
-            const newBalance = await updateBalanceFromAPI()
-            if (newBalance && userData) {
-                setUserData(prev => prev ? { ...prev, balance: newBalance } : null)
+            try {
+                const newBalance = await updateBalanceFromAPI()
+                if (newBalance) {
+                    setUserData(prev => {
+                        if (!prev) return null;
+                        return { ...prev, balance: Number(newBalance) }
+                    })
+                }
+            } catch (error) {
+                console.error('Error updating balance:', error)
             }
         }, 5000)
 
         return () => clearInterval(balanceInterval)
-    }, [router, userData])
+    }, [router]) // Remove userData from dependencies
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

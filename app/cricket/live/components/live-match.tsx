@@ -134,27 +134,6 @@ export default function LiveMatch() {
         }
     }, [])
 
-    // const updateAndStoreBalance = async () => {
-    //     try {
-    //         const profile = await fetchUserProfile()
-    //         if (profile?.balance) {
-    //             const balanceStr = profile.balance.toString()
-
-    //             setUserBalance(balanceStr)
-
-    //             const userData = localStorage.getItem('user_data')
-    //             if (userData) {
-    //                 const parsedData = JSON.parse(userData)
-    //                 parsedData.balance = balanceStr
-    //                 localStorage.setItem('user_data', JSON.stringify(parsedData))
-    //             }
-    //         }
-    //     } catch (error) {
-    //         console.error("Error updating balance:", error)
-    //         toast.error("Failed to update balance")
-    //     }
-    // }
-
     // Initial balance load from localStorage
     useEffect(() => {
         const userData = localStorage.getItem('user_data')
@@ -264,7 +243,6 @@ export default function LiveMatch() {
             const response = await createPrediction(betData)
 
             if (response.success) {
-                // Update balance in localStorage and state
                 const newBalance = (Number(userBalance) - stakeAmount).toString()
                 const userData = localStorage.getItem('user_data')
                 if (userData) {
@@ -287,15 +265,6 @@ export default function LiveMatch() {
                 })
             }
         } catch (error: unknown) {
-            if (error instanceof Error) {
-                toast.error("Error placing bet", {
-                    description: error instanceof Error ? error.message : "Please try again"
-                })
-            } else {
-                toast.error("Error placing bet", {
-                    description: "An unknown error occurred. Please try again"
-                })
-            }
             toast.error("Error placing bet", {
                 description: error instanceof Error ? error.message : "Please try again"
             })
@@ -370,7 +339,8 @@ export default function LiveMatch() {
                         isBookmakerRunner(runner) ? (runner as BookmakerRunner).selectionId : undefined
             })
             setSelectedOdds(oddsValue)
-            setSelectedStake("")
+            // Set minimum stake automatically when odds are selected
+            setSelectedStake(MIN_STAKE.toString())
             if (isMobile) {
                 setShowMobileBetForm(true)
             }
@@ -417,6 +387,23 @@ export default function LiveMatch() {
         return () => clearInterval(interval)
     }, [fetchOddsData])
 
+    const calculateReturns = useCallback(() => {
+        if (!selectedOdds || !selectedStake) return null;
+
+        const stake = Number(selectedStake);
+        const odds = Number(selectedOdds);
+
+        if (isNaN(stake) || isNaN(odds)) return null;
+
+        const potentialReturn = stake * odds;
+        const potentialProfit = potentialReturn - stake;
+
+        return {
+            potentialReturn,
+            potentialProfit
+        };
+    }, [selectedOdds, selectedStake]);
+
     if (error)
         return (
             <div className="flex items-center justify-center min-h-screen bg-[#2a1a47]">
@@ -439,7 +426,7 @@ export default function LiveMatch() {
                     </div>
 
                     {/* Toggle buttons */}
-                    <div className="flex gap-2 mb-4">
+                    <div className=" gap-2 mb-4 hidden">
                         <Button
                             variant={showVideo ? "outline" : "default"}
                             onClick={() => setShowVideo(false)}
@@ -461,19 +448,19 @@ export default function LiveMatch() {
                         {showVideo ? (
                             <VideoStream matchId={eventId || "333333"} />
                         ) : (
-                            <iframe
-                                ref={iframeRef}
-                                src="https://www.satsports.net/score_widget/index.html?id=58145129"
-                                className="w-full border-0 overflow-y-hidden"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                                allowFullScreen
-                                style={{
-                                    minHeight: "100px",
-
-                                    display: "block",
-                                    backgroundColor: "transparent",
-                                }}
-                            />
+                            <>
+                                <div className="overflow-hidden w-full h-[55px] md:h-[50px]">
+                                    <iframe
+                                        ref={iframeRef}
+                                        src="https://www.satsports.net/score_widget/index.html?id=58145129"
+                                        className="w-full h-full border-0 overflow-hidden"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                                        allowFullScreen
+                                        scrolling="no"
+                                    />
+                                </div>
+                                <VideoStream matchId={eventId || "333333"} />
+                            </>
                         )}
                     </div>
                 </div>
@@ -782,6 +769,19 @@ export default function LiveMatch() {
 
                                 {/* Betting Form Content */}
                                 <div className="space-y-4">
+                                    {/* Add returns display */}
+                                    {calculateReturns() && (
+                                        <div className="bg-[#3a2255] rounded-lg p-3 border border-purple-900">
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span className="text-gray-300">Potential Return:</span>
+                                                <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-300">Potential Profit:</span>
+                                                <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    )}
                                     <Input
                                         type="number"
                                         value={selectedOdds}
@@ -894,6 +894,19 @@ export default function LiveMatch() {
                             </div>
 
                             <div className="space-y-4">
+                                {/* Add returns display */}
+                                {calculateReturns() && (
+                                    <div className="bg-[#3a2255] rounded-lg p-3 border border-purple-900">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-gray-300">Potential Return:</span>
+                                            <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-300">Potential Profit:</span>
+                                            <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                )}
                                 <Input
                                     type="number"
                                     value={selectedOdds}
