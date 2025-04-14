@@ -444,26 +444,27 @@ export default function LiveMatch() {
                     </div>
 
                     {/* Live Score/Video Container */}
-                    <div className="w-full h-[300px] md:h-[400px] bg-black/30 rounded-lg overflow-hidden mb-4">
-                        {showVideo ? (
+                    <div className="w-full flex flex-col gap-2">
+                        {/* Video Container */}
+                        <div className="w-full h-[300px] md:h-[400px] bg-black/30 rounded-lg overflow-hidden">
                             <VideoStream matchId={eventId || "333333"} />
-                        ) : (
-                            <>
-                                 <VideoStream matchId={eventId || "333333"} />
-                                <div className="overflow-hidden w-full h-[55px] md:h-[50px]">
-                                    <iframe
-                                        scrolling="no"
-                                        ref={iframeRef}
-                                        src="https://www.satsports.net/score_widget/index.html?id=58145139"
-                                        className="w-full h-full border-0 overflow-hidden"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                                        allowFullScreen
-                                        
-                                    />
-                                </div>
-                               
-                            </>
-                        )}
+                        </div>
+
+                        {/* Score Container */}
+                        <div className="w-full h-[50px] bg-black/30 rounded-lg overflow-hidden">
+                            <iframe
+                                ref={iframeRef}
+                                src="https://www.satsports.net/score_widget/index.html?id=58145139"
+                                className="w-full h-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                                allowFullScreen
+                                scrolling="no"
+                                style={{
+                                    pointerEvents: "none", // Prevents scrolling
+                                    userSelect: "none"     // Prevents text selection
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
