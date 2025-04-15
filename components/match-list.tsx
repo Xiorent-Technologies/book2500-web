@@ -52,7 +52,8 @@ export function MatchList() {
     useEffect(() => {
         const fetchEventsAndOdds = async () => {
             try {
-                const response = await fetch("https://test.book2500.in/fetch-event/")
+                // const response = await fetch("https://test.book2500.in/fetch-event/")
+                const response = await fetch("http://51.21.182.1:3000/fetch-event/")
                 const json = await response.json()
                 const data: EventData[] = json.data || []
 
@@ -63,8 +64,11 @@ export function MatchList() {
 
                         const marketId = match.marketIds[0].marketId
                         try {
+                            // const oddsResponse = await fetch(
+                            //     `https://test.book2500.in/fetch-event-odds/${match.event.id}/${marketId}`,
+                            // )
                             const oddsResponse = await fetch(
-                                `https://test.book2500.in/fetch-event-odds/${match.event.id}/${marketId}`,
+                                `http://51.21.182.1:3000/fetch-event-odds/${match.event.id}/${marketId}`,
                             )
                             const oddsData = await oddsResponse.json()
 

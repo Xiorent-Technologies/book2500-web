@@ -358,9 +358,12 @@ export default function LiveMatch() {
 
         try {
             const [eventRes, fancyRes, bookmakerRes] = await Promise.all([
-                fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`http://51.21.182.1:3000/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`http://51.21.182.1:3000/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`http://51.21.182.1:3000/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
             ])
 
             if (eventRes?.data) {
@@ -397,10 +400,12 @@ export default function LiveMatch() {
 
         const potentialReturn = stake * odds;
         const potentialProfit = potentialReturn - stake;
+        const potentialLoss = -stake; // Add potential loss calculation
 
         return {
             potentialReturn,
-            potentialProfit
+            potentialProfit,
+            potentialLoss // Add to return object
         };
     }, [selectedOdds, selectedStake]);
 
@@ -779,9 +784,13 @@ export default function LiveMatch() {
                                                 <span className="text-gray-300">Potential Return:</span>
                                                 <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between text-sm">
+                                            <div className="flex justify-between text-sm mb-1">
                                                 <span className="text-gray-300">Potential Profit:</span>
                                                 <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-300">Potential Loss:</span>
+                                                <span className="text-red-400">₹{calculateReturns()?.potentialLoss.toLocaleString()}</span>
                                             </div>
                                         </div>
                                     )}
@@ -904,9 +913,13 @@ export default function LiveMatch() {
                                             <span className="text-gray-300">Potential Return:</span>
                                             <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between text-sm">
+                                        <div className="flex justify-between text-sm mb-1">
                                             <span className="text-gray-300">Potential Profit:</span>
                                             <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-300">Potential Loss:</span>
+                                            <span className="text-red-400">₹{calculateReturns()?.potentialLoss.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 )}
