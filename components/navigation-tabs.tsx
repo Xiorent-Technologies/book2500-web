@@ -15,7 +15,7 @@ export function NavigationTabs() {
                     <button
                         key={tab}
                         className={cn(
-                            "py-4 px-2 text-white font-bold text-sm md:text-lg flex-1 text-center",
+                            "py-4 px-2 text-white font-bold text-[12px] md:text-lg flex-1 text-center",
                             activeTab === tab ? "text-white" : "text-gray-300",
                         )}
                         onClick={() => setActiveTab(tab)}
