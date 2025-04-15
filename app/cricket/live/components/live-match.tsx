@@ -361,9 +361,9 @@ export default function LiveMatch() {
                 // fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
                 // fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
                 // fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in//fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in//fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in//fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
             ])
 
             if (eventRes?.data) {
