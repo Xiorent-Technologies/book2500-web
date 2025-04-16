@@ -3,15 +3,14 @@
 import { useEffect, useRef } from "react"
 
 interface VideoStreamProps {
-    matchId: string
+    tvUrl: string
 }
 
-export function VideoStream({ matchId }: VideoStreamProps) {
+export function VideoStream({ tvUrl }: VideoStreamProps) {
     const iframeRef = useRef<HTMLIFrameElement>(null)
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            // Handle any messages from the iframe if needed
             if (event.origin === "https://tvapp.1ten.live" && event.data) {
                 console.log("Message from stream:", event.data)
             }
@@ -25,7 +24,7 @@ export function VideoStream({ matchId }: VideoStreamProps) {
         <div className="w-full h-full bg-black relative">
             <iframe
                 ref={iframeRef}
-                src={`https://tvapp.1ten.live/event-play-2/${matchId}`}
+                src={tvUrl}
                 className="w-full h-full border-0"
                 allow="fullscreen"
                 allowFullScreen

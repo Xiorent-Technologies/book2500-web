@@ -70,6 +70,12 @@ interface BetItem extends Runner {
     SelectionId?: number | string
 }
 
+interface LiveMatchData {
+    eventId: string
+    tv: string
+    iframeScore: string
+}
+
 const MIN_STAKE = 100
 const MAX_STAKE = 250000
 const predefinedStakes = [
@@ -127,6 +133,7 @@ export default function LiveMatch() {
     })
     const [showVideo, setShowVideo] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
+    const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null)
 
     const searchParams = useSearchParams()
     const eventId = searchParams.get("match")
@@ -187,6 +194,30 @@ export default function LiveMatch() {
             return () => window.removeEventListener("message", handleMessage)
         }
     }, [])
+
+    useEffect(() => {
+        const fetchLiveMatchData = async () => {
+            try {
+                const response = await fetch("https://tvapp.1ten.live/api/get-all-tv")
+                const data: LiveMatchData[] = await response.json()
+
+                // Find the match data for current eventId
+                const matchData = data.find(match => match.eventId === eventId)
+                if (matchData) {
+                    setLiveMatchData(matchData)
+                }
+            } catch (error) {
+                console.error("Error fetching live match data:", error)
+            }
+        }
+
+        if (eventId) {
+            fetchLiveMatchData()
+            // Refresh live data every 30 seconds
+            const interval = setInterval(fetchLiveMatchData, 30000)
+            return () => clearInterval(interval)
+        }
+    }, [eventId])
 
     const handleStakeButton = (type: "min" | "max" | "predefined", value?: number) => {
         if (type === "predefined" && value) {
@@ -471,14 +502,20 @@ export default function LiveMatch() {
                     <div className="w-full flex flex-col gap-2">
                         {/* Video Container */}
                         <div className="w-full h-[300px] md:h-[400px] bg-black/30 rounded-lg overflow-hidden">
-                            <VideoStream matchId={eventId || "333333"} />
+                            {liveMatchData?.tv ? (
+                                <VideoStream tvUrl={liveMatchData.tv} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white">
+                                    Live video not available
+                                </div>
+                            )}
                         </div>
 
                         {/* Score Container */}
                         <div className="w-full h-[55px] bg-black/30 rounded-lg overflow-hidden">
                             <iframe
                                 ref={iframeRef}
-                                src={`https://www.satsports.net/score_widget/index.html?id=${getScoreWidgetId(eventId)}`}
+                                src={liveMatchData?.iframeScore || `https://www.satsports.net/score_widget/index.html?id=${getScoreWidgetId(eventId)}`}
                                 className="w-full h-full border-0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                                 allowFullScreen
@@ -864,37 +901,36 @@ export default function LiveMatch() {
                                             </Button>
                                         ))}
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            onClick={() => handleStakeButton("min")}
-                                            className="bg-yellow-500 hover:bg-yellow-600 text-black flex-1 text-sm"
-                                        >
-                                            MIN
-                                        </Button>
-                                        <Button
-                                            onClick={() => handleStakeButton("max")}
-                                            className="bg-green-600 hover:bg-green-700 text-white flex-1 text-sm"
-                                        >
-                                            MAX
-                                        </Button>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="default"
-                                            className="bg-[#3a2255] text-white flex-1 text-sm"
-                                            onClick={handleClearStake}
-                                        >
-                                            Clear
-                                        </Button>
-                                        <Button
-                                            variant="default"
-                                            className="bg-green-600 text-white flex-1 text-sm"
-                                            onClick={handlePlaceBet}
-                                            disabled={!selectedBet || !selectedOdds || !selectedStake}
-                                        >
-                                            Place Bet
-                                        </Button>
-                                    </div>
+                                    <div className="flex gap-2"></div>
+                                    <Button
+                                        onClick={() => handleStakeButton("min")}
+                                        className="bg-yellow-500 hover:bg-yellow-600 text-black flex-1 text-sm"
+                                    >
+                                        MIN
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleStakeButton("max")}
+                                        className="bg-green-600 hover:bg-green-700 text-white flex-1 text-sm"
+                                    >
+                                        MAX
+                                    </Button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="default"
+                                        className="bg-[#3a2255] text-white flex-1 text-sm"
+                                        onClick={handleClearStake}
+                                    >
+                                        Clear
+                                    </Button>
+                                    <Button
+                                        variant="default"
+                                        className="bg-green-600 text-white flex-1 text-sm"
+                                        onClick={handlePlaceBet}
+                                        disabled={!selectedBet || !selectedOdds || !selectedStake}
+                                    >
+                                        Place Bet
+                                    </Button>
                                 </div>
                             </div>
                         </div>
