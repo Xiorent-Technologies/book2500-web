@@ -398,16 +398,23 @@ export default function LiveMatch() {
 
         if (isNaN(stake) || isNaN(odds)) return null;
 
-        const potentialReturn = stake * odds;
-        const potentialProfit = potentialReturn - stake;
-        const potentialLoss = -stake; // Add potential loss calculation
+        // Calculate returns based on selected bet type
+        const profit = (stake * odds) - stake;
+        const potentialReturn = stake + profit;
+
+        // Get selected team and other team
+        const otherTeam = eventOdds.runners?.find(r => r.runner !== selectedBet?.name)?.runner || '';
 
         return {
+            stake,
+            profit,
+            odds,
             potentialReturn,
-            potentialProfit,
-            potentialLoss // Add to return object
+            selectedTeam: selectedBet?.name || '',
+            otherTeam,
+            isBack: selectedBet?.type === 'BACK'
         };
-    }, [selectedOdds, selectedStake]);
+    }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
     if (error)
         return (
@@ -459,7 +466,7 @@ export default function LiveMatch() {
                         <div className="w-full h-[55px] bg-black/30 rounded-lg overflow-hidden">
                             <iframe
                                 ref={iframeRef}
-                                src="https://www.satsports.net/score_widget/index.html?id=58145139"
+                                src="https://www.satsports.net/score_widget/index.html?id=58145143"
                                 className="w-full h-full border-0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                                 allowFullScreen
@@ -779,18 +786,32 @@ export default function LiveMatch() {
                                 <div className="space-y-4">
                                     {/* Add returns display */}
                                     {calculateReturns() && (
-                                        <div className="bg-[#3a2255] rounded-lg p-3 border border-purple-900">
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-gray-300">Potential Return:</span>
-                                                <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
+                                        <div className="bg-[#3a2255] rounded-lg p-4 border border-purple-900 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-white">Confirm Bet Before Placing</span>
+                                                <span className="text-white font-bold">
+                                                    {selectedBet?.type}@{calculateReturns()?.odds.toFixed(2)}
+                                                </span>
                                             </div>
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-gray-300">Potential Profit:</span>
-                                                <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+
+                                            <div className="text-green-400 font-medium">
+                                                Potential return : +₹{calculateReturns()?.potentialReturn.toFixed(0)}
                                             </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-300">Potential Loss:</span>
-                                                <span className="text-red-400">₹{calculateReturns()?.potentialLoss.toLocaleString()}</span>
+
+                                            <div className="space-y-2 pt-2 border-t border-purple-800">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
+                                                    <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
+                                                    <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
+                                                        {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -908,18 +929,32 @@ export default function LiveMatch() {
                             <div className="space-y-4">
                                 {/* Add returns display */}
                                 {calculateReturns() && (
-                                    <div className="bg-[#3a2255] rounded-lg p-3 border border-purple-900">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span className="text-gray-300">Potential Return:</span>
-                                            <span className="text-green-400">₹{calculateReturns()?.potentialReturn.toLocaleString()}</span>
+                                    <div className="bg-[#3a2255] rounded-lg p-4 border border-purple-900 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white">Confirm Bet Before Placing</span>
+                                            <span className="text-white font-bold">
+                                                {selectedBet?.type}@{calculateReturns()?.odds.toFixed(2)}
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span className="text-gray-300">Potential Profit:</span>
-                                            <span className="text-green-400">₹{calculateReturns()?.potentialProfit.toLocaleString()}</span>
+
+                                        <div className="text-green-400 font-medium">
+                                            Potential return : +₹{calculateReturns()?.potentialReturn.toFixed(0)}
                                         </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-300">Potential Loss:</span>
-                                            <span className="text-red-400">₹{calculateReturns()?.potentialLoss.toLocaleString()}</span>
+
+                                        <div className="space-y-2 pt-2 border-t border-purple-800">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
+                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
+                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
+                                                    {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
