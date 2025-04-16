@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
+import "./styles.css"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import { Toaster } from "sonner"
