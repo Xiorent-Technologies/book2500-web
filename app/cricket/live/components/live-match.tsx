@@ -93,6 +93,18 @@ function isFancyRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is 
     return 'BackPrice1' in runner && 'LayPrice1' in runner
 }
 
+// Add this helper function near the other constants and helper functions
+const getScoreWidgetId = (matchId: string | null): number => {
+    const BASE_ID = 58145141; // First match ID
+    if (!matchId) return BASE_ID;
+
+    // Extract match number from the match ID
+    const matchNum = parseInt(matchId.replace(/\D/g, '')) % 10; // Get last digit
+
+    // Calculate widget ID: base + (matchNum * 2)
+    return BASE_ID + (matchNum * 2);
+};
+
 export default function LiveMatch() {
     const router = useRouter()
     const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null)
@@ -466,7 +478,7 @@ export default function LiveMatch() {
                         <div className="w-full h-[55px] bg-black/30 rounded-lg overflow-hidden">
                             <iframe
                                 ref={iframeRef}
-                                src="https://www.satsports.net/score_widget/index.html?id=58145143"
+                                src={`https://www.satsports.net/score_widget/index.html?id=${getScoreWidgetId(eventId)}`}
                                 className="w-full h-full border-0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                                 allowFullScreen
