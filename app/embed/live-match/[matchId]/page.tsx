@@ -1,5 +1,3 @@
-
-
 interface LiveMatchData {
     eventId: string;
     tv: string;
@@ -17,45 +15,22 @@ async function fetchLiveMatchData(matchId: string) {
     }
 }
 
-const getScoreWidgetId = (matchId: string): number => {
-    const BASE_ID = 58145141
-    const matchNum = parseInt(matchId.replace(/\D/g, '')) % 10
-    return BASE_ID + (matchNum * 2)
-}
 
 export default async function EmbedLiveMatch(props: {
     params: Promise<{ matchId: string }>
 }) {
-    // First await the params
     const params = await props.params;
     const matchId = params.matchId;
+    const match = await fetchLiveMatchData(matchId);
 
-    // Then use the matchId in parallel operations
-    const [match, score] = await Promise.all([
-        fetchLiveMatchData(matchId),
-        Promise.resolve(getScoreWidgetId(matchId))
-    ]);
-
+    // Combine both video and score into a single page
     return (
         <div className="min-h-screen bg-black">
-            <div className="embed-container">
-                <div className="video-container">
-                    {match?.tv ? (
-                        <iframe
-                            src={match.tv}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; fullscreen"
-                        />
-                    ) : (
-                        <div className="error-message">Live video not available</div>
-                    )}
-                </div>
-                <div className="score-container">
-                    <iframe
-                        src={match?.iframeScore || `https://www.satsports.net/score_widget/index.html?id=${score}`}
-                        scrolling="no"
-                    />
-                </div>
-            </div>
+            <iframe
+                src={`http://book2500.com/combined-view/${match}`}
+                className="w-full h-screen border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; fullscreen"
+            />
         </div>
-    )
+    );
 }
