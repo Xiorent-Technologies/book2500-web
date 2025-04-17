@@ -6,24 +6,12 @@ interface LiveMatchData {
 
 async function fetchLiveMatchData(matchId: string) {
     try {
-        // Add console.log to debug the matchId
-        console.log("Fetching data for matchId:", matchId);
-
         const response = await fetch('https://tvapp.1ten.live/api/get-all-tv', {
             cache: 'no-store',
-            headers: {
-                'Content-Type': 'application/json',
-            }
+            next: { revalidate: 0 }
         });
-
         const data: LiveMatchData[] = await response.json();
-        console.log("Received data:", data);
-
-        // Clean up the matchId by removing any path segments
-        const cleanMatchId = matchId.split('match=').pop() || matchId;
-        console.log("Clean matchId:", cleanMatchId);
-
-        return data.find(match => match.eventId === cleanMatchId);
+        return data.find(match => match.eventId === matchId);
     } catch (error) {
         console.error('Error fetching match data:', error);
         return null;
@@ -33,12 +21,15 @@ async function fetchLiveMatchData(matchId: string) {
 export default async function LiveMatchEmbed({
     params
 }: {
-    params: { matchId: string }
+    params: Promise<{ matchId: string }>
 }) {
-    // Extract just the ID number from any format
-    const cleanMatchId = params.matchId.includes('match=')
-        ? params.matchId.split('match=')[1]
-        : params.matchId;
+    // Wait for params to be available
+    const resolvedParams = await params;
+
+    // Extract match ID from the resolved params
+    const cleanMatchId = resolvedParams.matchId.includes('match=')
+        ? resolvedParams.matchId.split('match=')[1]
+        : resolvedParams.matchId;
 
     const matchData = await fetchLiveMatchData(cleanMatchId);
 
