@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { VideoStream } from "./video-stream"
 import { toast } from "sonner"
 import { createPrediction, type PredictionData } from "@/lib/api"
 import { updateBalanceFromAPI } from "@/lib/utils"
@@ -86,7 +85,7 @@ const predefinedStakes = [
 // Helper function to check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
 
-// Add these type guards after the interfaces
+// Add type guards
 function isMatchRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is Runner {
     return 'ex' in runner
 }
@@ -99,20 +98,12 @@ function isFancyRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is 
     return 'BackPrice1' in runner && 'LayPrice1' in runner
 }
 
-// Add this helper function near the other constants and helper functions
-const getScoreWidgetId = (matchId: string | null): number => {
-    const BASE_ID = 58145141; // First match ID
-    if (!matchId) return BASE_ID;
-
-    // Extract match number from the match ID
-    const matchNum = parseInt(matchId.replace(/\D/g, '')) % 10; // Get last digit
-
-    // Calculate widget ID: base + (matchNum * 2)
-    return BASE_ID + (matchNum * 2);
-};
-
 export default function LiveMatch() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const eventId = searchParams.get("match")
+    const marketId = searchParams.get("market")
+
     const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null)
     const [selectedOdds, setSelectedOdds] = useState("")
     const [selectedStake, setSelectedStake] = useState("")
@@ -126,20 +117,13 @@ export default function LiveMatch() {
     const [betError, setBetError] = useState<string | null>(null)
     const [userBalance, setUserBalance] = useState<string>("0")
     const [showMobileBetForm, setShowMobileBetForm] = useState(false)
+    const [isMobile, setIsMobile] = useState(false)
+    const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null)
     const [expandedSections, setExpandedSections] = useState({
         matchOdds: true,
         bookmaker: true,
         fancy: true,
     })
-    const [showVideo, setShowVideo] = useState(false)
-    const [isMobile, setIsMobile] = useState(false)
-    const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null)
-
-    const searchParams = useSearchParams()
-    const eventId = searchParams.get("match")
-    const marketId = searchParams.get("market")
-
-    const iframeRef = useRef<HTMLIFrameElement>(null)
 
     // Check if we're on mobile
     useEffect(() => {
@@ -183,41 +167,25 @@ export default function LiveMatch() {
     }, [])
 
     useEffect(() => {
-        const handleMessage = (event: MessageEvent<unknown>) => {
-            if (event.origin === "https://www.satsports.net" && event.data) {
-                console.log("Score update:", event.data)
-            }
-        }
-
-        if (isBrowser) {
-            window.addEventListener("message", handleMessage)
-            return () => window.removeEventListener("message", handleMessage)
-        }
-    }, [])
-
-    useEffect(() => {
         const fetchLiveMatchData = async () => {
+            if (!eventId) return;
+
             try {
-                const response = await fetch("https://tvapp.1ten.live/api/get-all-tv")
-                const data: LiveMatchData[] = await response.json()
-
-                // Find the match data for current eventId
-                const matchData = data.find(match => match.eventId === eventId)
-                if (matchData) {
-                    setLiveMatchData(matchData)
-                }
+                const response = await fetch('https://tvapp.1ten.live/api/get-all-tv', {
+                    cache: 'no-store'
+                });
+                const data: LiveMatchData[] = await response.json();
+                const matchData = data.find(match => match.eventId === eventId);
+                setLiveMatchData(matchData || null);
             } catch (error) {
-                console.error("Error fetching live match data:", error)
+                console.error('Error fetching live match data:', error);
             }
-        }
+        };
 
-        if (eventId) {
-            fetchLiveMatchData()
-            // Refresh live data every 30 seconds
-            const interval = setInterval(fetchLiveMatchData, 30000)
-            return () => clearInterval(interval)
-        }
-    }, [eventId])
+        fetchLiveMatchData();
+        const interval = setInterval(fetchLiveMatchData, 30000);
+        return () => clearInterval(interval);
+    }, [eventId]);
 
     const handleStakeButton = (type: "min" | "max" | "predefined", value?: number) => {
         if (type === "predefined" && value) {
@@ -258,7 +226,7 @@ export default function LiveMatch() {
 
         const stakeAmount = Number.parseFloat(selectedStake)
         if (isNaN(stakeAmount) || stakeAmount < MIN_STAKE || stakeAmount > MAX_STAKE) {
-            toast.error(`Stake must be between ${MIN_STAKE} and ${MAX_STAKE}`)
+            toast.error(Stake must be between ${MIN_STAKE} and ${MAX_STAKE})
             return
         }
 
@@ -296,7 +264,7 @@ export default function LiveMatch() {
                 setUserBalance(newBalance)
 
                 toast.success("Bet Placed Successfully!", {
-                    description: `${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}`
+                    description: ${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}
                 })
 
                 handleClearStake()
@@ -401,12 +369,9 @@ export default function LiveMatch() {
 
         try {
             const [eventRes, fancyRes, bookmakerRes] = await Promise.all([
-                // fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                // fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                // fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(http://51.21.182.1:3000/fetch-event-odds/${eventId}/${marketId}).then((res) => res.json()),
+                fetch(http://51.21.182.1:3000/fetch-fancy-odds/${eventId}/${marketId}).then((res) => res.json()),
+                fetch(http://51.21.182.1:3000/fetch-bookmaker-odds/${eventId}/${marketId}).then((res) => res.json()),
             ])
 
             if (eventRes?.data) {
@@ -480,51 +445,33 @@ export default function LiveMatch() {
                         {team1} vs {team2}
                     </div>
 
-                    {/* Toggle buttons */}
-                    <div className=" gap-2 mb-4 hidden">
-                        <Button
-                            variant={showVideo ? "outline" : "default"}
-                            onClick={() => setShowVideo(false)}
-                            className={`${!showVideo ? "bg-yellow-400 text-black" : "text-yellow-400 border-yellow-400"}`}
-                        >
-                            Live Score
-                        </Button>
-                        <Button
-                            variant={showVideo ? "default" : "outline"}
-                            onClick={() => setShowVideo(true)}
-                            className={`${showVideo ? "bg-yellow-400 text-black" : "text-yellow-400 border-yellow-400"}`}
-                        >
-                            Live Match
-                        </Button>
-                    </div>
-
-                    {/* Live Score/Video Container */}
+                    {/* Combined Video and Score Container */}
                     <div className="w-full flex flex-col gap-2">
                         {/* Video Container */}
-                        <div className="w-full h-[300px] md:h-[400px] bg-black/30 rounded-lg overflow-hidden">
+                        <div className="w-full h-[300px] bg-black rounded-lg overflow-hidden">
                             {liveMatchData?.tv ? (
-                                <VideoStream tvUrl={liveMatchData.tv} />
+                                <iframe
+                                    src={liveMatchData.tv}
+                                    className="w-full h-full border-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; fullscreen"
+                                    allowFullScreen
+                                />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-white">
+                                <div className="w-full h-full flex items-center justify-center text-gray-500">
                                     Live video not available
                                 </div>
                             )}
                         </div>
 
                         {/* Score Container */}
-                        <div className="w-full h-[55px] bg-black/30 rounded-lg overflow-hidden">
-                            <iframe
-                                ref={iframeRef}
-                                src={liveMatchData?.iframeScore || `https://www.satsports.net/score_widget/index.html?id=${getScoreWidgetId(eventId)}`}
-                                className="w-full h-full border-0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                                allowFullScreen
-                                scrolling="no"
-                                style={{
-                                    pointerEvents: "none", // Prevents scrolling
-                                    userSelect: "none"     // Prevents text selection
-                                }}
-                            />
+                        <div className="w-full h-[55px] bg-black rounded-lg overflow-hidden">
+                            {liveMatchData?.iframeScore && (
+                                <iframe
+                                    src={liveMatchData.iframeScore}
+                                    className="w-full h-full border-0"
+                                    scrolling="no"
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -587,9 +534,9 @@ export default function LiveMatch() {
 
                                                         return (
                                                             <div
-                                                                key={`back-${i}`}
+                                                                key={back-${i}}
                                                                 onClick={() => isAvailable && handleOddsClick(runner, "back", "match")}
-                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#72bbee]" : i === 1 ? "bg-[#72bbee] " : "bg-[#72bbee] "}`}
+                                                                className={flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#72bbee]" : i === 1 ? "bg-[#72bbee] " : "bg-[#72bbee] "}}
                                                             >
                                                                 <div className="text-white font-bold">{odds > 0 ? odds.toFixed(2) : "0.0"}</div>
                                                                 <div className="text-xs text-gray-200">{size > 0 ? size.toLocaleString() : "0.0"}</div>
@@ -605,9 +552,9 @@ export default function LiveMatch() {
 
                                                         return (
                                                             <div
-                                                                key={`lay-${i}`}
+                                                                key={lay-${i}}
                                                                 onClick={() => isAvailable && handleOddsClick(runner, "lay", "match")}
-                                                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#ff9393]" : i === 1 ? "bg-[#ff9393] " : "bg-[#ff9393]"}`}
+                                                                className={flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"} ${i === 0 ? "bg-[#ff9393]" : i === 1 ? "bg-[#ff9393] " : "bg-[#ff9393]"}}
                                                             >
                                                                 <div className="text-white font-bold">{odds > 0 ? odds.toFixed(2) : "0.0"}</div>
                                                                 <div className="text-xs text-gray-200">{size > 0 ? size.toLocaleString() : "0.0"}</div>
@@ -664,7 +611,7 @@ export default function LiveMatch() {
                                                     {/* Back columns (3) */}
                                                     {[2, 1, 0].map((i) => (
                                                         <div
-                                                            key={`back-${i}`}
+                                                            key={back-${i}}
                                                             onClick={() => !isSuspended && handleOddsClick(runner, "back", "bookmaker")}
                                                             className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
                                                                 ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#72bbee]`}
@@ -681,7 +628,7 @@ export default function LiveMatch() {
                                                     {/* Lay columns (3) */}
                                                     {[0, 1, 2].map((i) => (
                                                         <div
-                                                            key={`lay-${i}`}
+                                                            key={lay-${i}}
                                                             onClick={() => !isSuspended && handleOddsClick(runner, "lay", "bookmaker")}
                                                             className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
                                                                 ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#ff9393]`}
@@ -850,14 +797,14 @@ export default function LiveMatch() {
                                             <div className="space-y-2 pt-2 border-t border-purple-800">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
-                                                    <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
+                                                    <span className={font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}}>
                                                         {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
                                                     </span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
-                                                    <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
+                                                    <span className={font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}}>
                                                         {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
                                                     </span>
                                                 </div>
@@ -882,7 +829,7 @@ export default function LiveMatch() {
                                     <div className="grid grid-cols-4 gap-2 mb-2">
                                         {predefinedStakes[0].map((stake, index) => (
                                             <Button
-                                                key={`stake-${index}`}
+                                                key={stake-${index}}
                                                 onClick={() => handleStakeButton("predefined", stake)}
                                                 className="bg-[#3a2255] hover:bg-[#4c2a70] text-white text-sm py-1"
                                             >
@@ -893,7 +840,7 @@ export default function LiveMatch() {
                                     <div className="grid grid-cols-4 gap-2 mb-2">
                                         {predefinedStakes[1].map((stake, index) => (
                                             <Button
-                                                key={`stake-${index}`}
+                                                key={stake-${index}}
                                                 onClick={() => handleStakeButton("predefined", stake)}
                                                 className="bg-[#3a2255] hover:bg-[#4c2a70] text-white text-sm py-1"
                                             >
@@ -992,14 +939,14 @@ export default function LiveMatch() {
                                         <div className="space-y-2 pt-2 border-t border-purple-800">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
-                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
+                                                <span className={font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}}>
                                                     {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
                                                 </span>
                                             </div>
 
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
-                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
+                                                <span className={font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}}>
                                                     {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
                                                 </span>
                                             </div>
