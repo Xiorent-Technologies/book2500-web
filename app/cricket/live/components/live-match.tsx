@@ -73,6 +73,7 @@ interface LiveMatchData {
     eventId: string
     tv: string
     iframeScore: string
+    isLive?: boolean
 }
 
 const MIN_STAKE = 100
@@ -124,6 +125,7 @@ export default function LiveMatch() {
         bookmaker: true,
         fancy: true,
     })
+    const [isMatchLive, setIsMatchLive] = useState(false)
 
     // Check if we're on mobile
     useEffect(() => {
@@ -177,6 +179,9 @@ export default function LiveMatch() {
                 const data: LiveMatchData[] = await response.json();
                 const matchData = data.find(match => match.eventId === eventId);
                 setLiveMatchData(matchData || null);
+
+                // Set live status based on TV stream availability
+                setIsMatchLive(!!matchData?.tv);
             } catch (error) {
                 console.error('Error fetching live match data:', error);
             }
@@ -287,6 +292,12 @@ export default function LiveMatch() {
         type: "back" | "lay" | "no" | "yes",
         section: "match" | "bookmaker" | "fancy"
     ) => {
+        // Check if trying to place fancy bet when match is not live
+        if (section === "fancy" && !isMatchLive) {
+            toast.error("Fancy betting is only available for live matches");
+            return;
+        }
+
         setBetError(null)
 
         try {
@@ -671,7 +682,9 @@ export default function LiveMatch() {
                             >
                                 <div className="flex items-center">
                                     <div className="w-6 h-6 text-white flex items-center justify-center mr-2">★</div>
-                                    <h2 className="text-white font-bold">FANCY</h2>
+                                    <h2 className="text-white font-bold">
+                                        FANCY {!isMatchLive && <span className="text-red-500 text-sm">(Available during live matches only)</span>}
+                                    </h2>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">CASHOUT</div>
@@ -681,7 +694,7 @@ export default function LiveMatch() {
                             </div>
 
                             {expandedSections.fancy && (
-                                <div className="p-0">
+                                <div className={`p-0 ${!isMatchLive ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <div className="grid grid-cols-2 w-full">
                                         <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
                                             NO
