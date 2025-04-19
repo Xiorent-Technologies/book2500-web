@@ -59,12 +59,16 @@ export interface PredictionData {
     selection_id: string
     type: string
     is_back: boolean
-    ratio: number
+    ratio: string
     level: number
     bet_category: string
     match_name: string
     runner_name: string
 }
+
+// "match_id": mapped?.matchId,
+//     "betquestion_id": mapped?.questionId,
+//         "betoption_id": mapped?.optionId,
 
 export interface PredictionResponse {
     success: boolean
@@ -115,5 +119,84 @@ export async function createPrediction(predictionData: PredictionData): Promise<
             success: false,
             message: errorMessage
         }
+    }
+}
+
+export interface FancyMapping {
+    runnerName: string;
+    matchId: string;
+    questionId: number;
+    optionId: number;
+    optionName: string;
+    selectionId: string;
+    min: string;
+    max: string;
+}
+
+export interface FancyMappingResponse {
+    success: boolean;
+    data: FancyMapping[];
+}
+
+export async function fetchFancyMappings(eventId: string, marketId: string): Promise<FancyMapping[]> {
+    try {
+        const response = await fetch('https://book2500.in/api/fancy-odds', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_id: eventId,
+                market_id: marketId
+            })
+        });
+
+        const data = await response.json();
+        return data.data || [];
+    } catch (error) {
+        console.error('Error fetching fancy mappings:', error);
+        return [];
+    }
+}
+
+export async function fetchBookmakerMappings(eventId: string, marketId: string): Promise<FancyMapping[]> {
+    try {
+        const response = await fetch('https://book2500.funzip.in/api/bookmaker-odds', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_id: eventId,
+                market_id: marketId
+            })
+        });
+
+        const data = await response.json();
+        return data.data || [];
+    } catch (error) {
+        console.error('Error fetching bookmaker mappings:', error);
+        return [];
+    }
+}
+
+export async function fetchMatchMappings(eventId: string, marketId: string): Promise<FancyMapping[]> {
+    try {
+        const response = await fetch('https://book2500.funzip.in/api/event-odds', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_id: eventId,
+                market_id: marketId
+            })
+        });
+
+        const data = await response.json();
+        return data.data || [];
+    } catch (error) {
+        console.error('Error fetching match mappings:', error);
+        return [];
     }
 }

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { createPrediction, type PredictionData } from "@/lib/api"
+import { fetchFancyMappings, fetchBookmakerMappings, fetchMatchMappings, type FancyMapping } from "@/lib/api"
 import { updateBalanceFromAPI } from "@/lib/utils"
 
 interface Runner {
@@ -126,6 +126,9 @@ export default function LiveMatch() {
         fancy: true,
     })
     const [isMatchLive, setIsMatchLive] = useState(false)
+    const [fancyMappings, setFancyMappings] = useState<FancyMapping[]>([])
+    const [bookmakerMappings, setBookmakerMappings] = useState<FancyMapping[]>([])
+    const [matchMappings, setMatchMappings] = useState<FancyMapping[]>([])
 
     // Check if we're on mobile
     useEffect(() => {
@@ -212,80 +215,156 @@ export default function LiveMatch() {
         }))
     }
 
-    const handlePlaceBet = async () => {
-        if (!isBrowser) return
+    const fetchAllMappings = useCallback(async () => {
+        if (!eventId || !marketId) return;
 
-        const token = localStorage.getItem("auth_token")
+        try {
+            const [fancy, bookmaker, match] = await Promise.all([
+                fetchFancyMappings(eventId, marketId),
+                fetchBookmakerMappings(eventId, marketId),
+                fetchMatchMappings(eventId, marketId)
+            ]);
+
+            setFancyMappings(fancy);
+            setBookmakerMappings(bookmaker);
+            setMatchMappings(match);
+        } catch (error) {
+            console.error('Error fetching mappings:', error);
+        }
+    }, [eventId, marketId]);
+
+    useEffect(() => {
+        fetchAllMappings();
+    }, [fetchAllMappings]);
+
+    const getBySelectionId = useCallback((selectionId: string, mappings: FancyMapping[]) => {
+        return mappings.find(mapping => mapping.selectionId === selectionId) || null;
+    }, []);
+
+    const getBySelectionIdAndOptionName = useCallback((selectionId: string, optionName: string, mappings: FancyMapping[]) => {
+        return mappings.filter(mapping => 
+            mapping.selectionId === selectionId && 
+            mapping.optionName.toLowerCase() === optionName.toLowerCase()
+        );
+    }, []);
+
+    const handlePlaceBet = async () => {
+        if (!isBrowser) return;
+
+        const token = localStorage.getItem("auth_token");
         if (!token) {
-            toast.error("Please login to place bets")
-            router.push("/login")
-            return
+            toast.error("Please login to place bets");
+            router.push("/login");
+            return;
         }
 
-        setBetError(null)
+        setBetError(null);
 
         if (!selectedBet || !selectedOdds || !selectedStake) {
-            toast.error("Please select odds and enter stake amount")
-            return
+            toast.error("Please select odds and enter stake amount");
+            return;
         }
 
-        const stakeAmount = Number.parseFloat(selectedStake)
+        const stakeAmount = Number.parseFloat(selectedStake);
         if (isNaN(stakeAmount) || stakeAmount < MIN_STAKE || stakeAmount > MAX_STAKE) {
-            toast.error(`Stake must be between ${MIN_STAKE} and ${MAX_STAKE}`)
-            return
+            toast.error(`Stake must be between ${MIN_STAKE} and ${MAX_STAKE}`);
+            return;
         }
 
-        const currentBalance = Number.parseFloat(userBalance)
+        const currentBalance = Number.parseFloat(userBalance);
         if (isNaN(currentBalance) || currentBalance < stakeAmount) {
-            toast.error("Insufficient balance. Please add funds to your account.")
-            return
+            toast.error("Insufficient balance. Please add funds to your account.");
+            return;
         }
 
         try {
-            const betData: PredictionData = {
-                invested_amount: stakeAmount,
-                event_id: eventId!,
-                market_id: marketId!,
-                selection_id: selectedBet.selectionId?.toString() || "",
-                type: "event-odds",
-                is_back: selectedBet.type === 'BACK',
-                ratio: Number(selectedOdds),
-                level: 1,
-                bet_category: selectedBet.section.toLowerCase(),
-                match_name: eventOdds.eventName,
-                runner_name: selectedBet.name
+            // Show loading toast
+            const loadingToast = toast.loading('Placing Bet', {
+                description: 'Please wait while we process your bet...'
+            });
+
+            let mapped: FancyMapping | null = null;
+
+            if (selectedBet.section === "MATCH") {
+                const mappings = getBySelectionIdAndOptionName(
+                    selectedBet.selectionId?.toString() || "",
+                    selectedBet.type === "BACK" ? "Back" : "Lay",
+                    matchMappings
+                );
+                mapped = mappings[0] || null;
+            } else if (selectedBet.section === "BOOKMAKER") {
+                mapped = getBySelectionId(selectedBet.selectionId?.toString() || "", bookmakerMappings);
+            } else if (selectedBet.section === "FANCY") {
+                mapped = getBySelectionId(selectedBet.selectionId?.toString() || "", fancyMappings);
             }
 
-            const response = await createPrediction(betData)
+            if (!mapped) {
+                toast.dismiss(loadingToast);
+                toast.error("Could not find mapping for selected bet");
+                return;
+            }
 
-            if (response.success) {
-                const newBalance = (Number(userBalance) - stakeAmount).toString()
-                const userData = localStorage.getItem('user_data')
+            const requestBody = {
+                invest_amount: stakeAmount,
+                ratio: selectedOdds.toString(),
+                betoption_id: mapped.optionId,
+                betquestion_id: mapped.questionId,
+                match_id: parseInt(mapped.matchId)
+            };
+
+            console.log('Placing bet with:', requestBody);
+
+            const response = await fetch("https://book2500.funzip.in/api/prediction", {
+                method: "POST",
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+            toast.dismiss(loadingToast);
+
+            if (data.success) {
+                const newBalance = (currentBalance - stakeAmount).toString();
+                const userData = localStorage.getItem('user_data');
                 if (userData) {
-                    const parsedData = JSON.parse(userData)
-                    parsedData.balance = newBalance
-                    localStorage.setItem('user_data', JSON.stringify(parsedData))
+                    const parsedData = JSON.parse(userData);
+                    parsedData.balance = newBalance;
+                    localStorage.setItem('user_data', JSON.stringify(parsedData));
                 }
-                setUserBalance(newBalance)
+                setUserBalance(newBalance);
 
                 toast.success("Bet Placed Successfully!", {
                     description: `${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}`
-                })
+                });
 
-                handleClearStake()
-                setSelectedBet(null)
-                setShowMobileBetForm(false)
+                handleClearStake();
+                setSelectedBet(null);
+                setShowMobileBetForm(false);
+                fetchOddsData();
             } else {
-                toast.error("Failed to place bet", {
-                    description: response.message || "Please try again"
-                })
+                if (data.errors) {
+                    const errorMessages = Object.entries(data.errors)
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join('\n');
+                    toast.error("Validation Error", {
+                        description: errorMessages
+                    });
+                } else {
+                    toast.error("Failed to place bet", {
+                        description: data.message || "Please try again"
+                    });
+                }
             }
         } catch (error: unknown) {
             toast.error("Error placing bet", {
                 description: error instanceof Error ? error.message : "Please try again"
-            })
+            });
         }
-    }
+    };
 
     const handleOddsClick = (
         runner: Runner | BookmakerRunner | FancyOdds,
