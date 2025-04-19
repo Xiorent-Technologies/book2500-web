@@ -380,13 +380,13 @@ export default function LiveMatch() {
 
         try {
             const [eventRes, fancyRes, bookmakerRes] = await Promise.all([
-                // fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                // fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                // fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                fetch(`https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
 
-                fetch(`http://51.21.182.1:3000/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`http://51.21.182.1:3000/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
-                fetch(`http://51.21.182.1:3000/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`http://51.21.182.1:3000/fetch-event-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`http://51.21.182.1:3000/fetch-fancy-odds/${eventId}/${marketId}`).then((res) => res.json()),
+                // fetch(`http://51.21.182.1:3000/fetch-bookmaker-odds/${eventId}/${marketId}`).then((res) => res.json()),
             ])
 
             if (eventRes?.data) {
