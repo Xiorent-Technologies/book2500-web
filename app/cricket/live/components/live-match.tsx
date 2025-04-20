@@ -22,6 +22,17 @@ import {
 } from "@/components/ui/dialog";
 import { EventOdd } from '@/lib/types/odds';
 
+const MIN_STAKE = 100
+const MAX_STAKE = 250000
+
+// Add this constant for predefined stakes
+const PREDEFINED_STAKES = {
+    low: [100, 500, 1000, 2000],
+    high: [5000, 10000, 25000, 50000]
+} as const
+
+const isBrowser = typeof window !== "undefined"
+
 interface Runner {
     Option_id: number
     Question_id: number
@@ -97,7 +108,7 @@ interface LiveMatchData {
 
 interface FancyOddsMapping {
     RunnerName: string;
-    Match_id: number;
+    Match_id: string;
     Question_id: number;
     Option_id: number;
     Option_name: string;
@@ -200,6 +211,69 @@ interface RealTimeFancyOdds {
     max: string;
 }
 
+interface GroupedFancyOdd {
+    RunnerName: string;
+    Match_id: string;
+    Question_id: number;
+    back: {
+        Option_id: number;
+        Option_name: string;
+        SelectionId: string;
+        min: string;
+        max: string;
+        price: number;
+        size: number;
+    } | null;
+    lay: {
+        Option_id: number;
+        Option_name: string;
+        SelectionId: string;
+        min: string;
+        max: string;
+        price: number;
+        size: number;
+    } | null;
+}
+
+interface FancyApiMapping {
+    RunnerName: string;
+    Match_id: string;
+    Question_id: number;
+    Option_id: number;
+    Option_name: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+}
+
+interface RealTimeRunner {
+    selectionId: string;
+    ex?: {
+        availableToBack: Array<{ price: number; size: number }>;
+        availableToLay: Array<{ price: number; size: number }>;
+    };
+}
+
+interface RealTimeOdds {
+    data: {
+        runners: RealTimeRunner[];
+    };
+}
+
+interface RealTimeFancyOdd {
+    RunnerName: string;
+    LayPrice1: number;
+    LaySize1: number;
+    BackPrice1: number;
+    BackSize1: number;
+    GameStatus: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+    gtype: string;
+    rem: string;
+}
+
 function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -230,41 +304,6 @@ function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
     );
 }
 
-const MIN_STAKE = 100
-const MAX_STAKE = 250000
-const predefinedStakes = [
-    [100, 500, 1000, 2000],
-    [5000, 10000, 25000, 50000],
-]
-
-const isBrowser = typeof window !== "undefined"
-
-function isMatchRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is Runner {
-    return 'ex' in runner
-}
-
-function isBookmakerRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is BookmakerRunner {
-    return 'batb' in runner && 'batl' in runner
-}
-
-function isFancyRunner(runner: Runner | BookmakerRunner | FancyOdds): runner is FancyOdds {
-    return 'BackPrice1' in runner && 'LayPrice1' in runner
-}
-
-interface RealTimeRunner {
-    selectionId: string;
-    ex?: {
-        availableToBack: Array<{ price: number; size: number }>;
-        availableToLay: Array<{ price: number; size: number }>;
-    };
-}
-
-interface RealTimeOdds {
-    data: {
-        runners: RealTimeRunner[];
-    };
-}
-
 export default function LiveMatch() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -289,7 +328,7 @@ export default function LiveMatch() {
         fancy: true,
     })
     const [isMatchLive, setIsMatchLive] = useState(false)
-    const [fancyOddsMappings, setFancyOddsMappings] = useState<FancyOddsMapping[]>([])
+    const [fancyOddsMappings, setFancyOddsMappings] = useState<GroupedFancyOdd[]>([])
     const [fancyApiData, setFancyApiData] = useState<FancyOddApiData[]>([])
     const [initialOdds, setInitialOdds] = useState<EventOddsResponse["data"]>([]);
     const [matchApiData, setMatchApiData] = useState<EventOddApiData[]>([]);
@@ -298,7 +337,7 @@ export default function LiveMatch() {
     const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
     const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>([]);
 
-    const handleFancyOddsUpdate = useCallback((realtimeOdds: any[]) => {
+    const handleFancyOddsUpdate = useCallback((realtimeOdds: RealTimeFancyOdds[]) => {
         setFancyOdds(prevOdds => {
             return prevOdds.map(odd => {
                 const updatedOdd = realtimeOdds.find(
@@ -308,11 +347,13 @@ export default function LiveMatch() {
                 if (updatedOdd) {
                     return {
                         ...odd,
-                        BackPrice1: updatedOdd.BackPrice1,
-                        BackSize1: updatedOdd.BackSize1,
-                        LayPrice1: updatedOdd.LayPrice1,
-                        LaySize1: updatedOdd.LaySize1,
-                        isSuspended: !updatedOdd.BackPrice1 || !updatedOdd.LayPrice1 || updatedOdd.GameStatus === 'SUSPENDED'
+                        BackPrice1: updatedOdd.BackPrice1 || 0,
+                        BackSize1: updatedOdd.BackSize1 || 0,
+                        LayPrice1: updatedOdd.LayPrice1 || 0,
+                        LaySize1: updatedOdd.LaySize1 || 0,
+                        isSuspended: !updatedOdd.BackPrice1 ||
+                            !updatedOdd.LayPrice1 ||
+                            updatedOdd.GameStatus === 'SUSPENDED'
                     };
                 }
                 return odd;
@@ -482,14 +523,12 @@ export default function LiveMatch() {
 
     useEffect(() => {
         const fetchInitialFancyOdds = async () => {
-            if (!eventId) return;
+            if (!eventId || !marketId) return;
 
             try {
-                const token = localStorage.getItem("auth_token");
                 const response = await fetch("https://book2500.funzip.in/api/fancy-odds", {
                     method: 'POST',
                     headers: {
-
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -500,54 +539,103 @@ export default function LiveMatch() {
                 });
 
                 const data = await response.json();
-                console.log("Initial Fancy Data:", data);
 
-                if (data.success && data.data) {
-                    // First set the initial fancy odds from the API directly
-                    const initialFancyOdds = data.data.map(odd => ({
-                        RunnerName: odd.RunnerName,
-                        BackPrice1: 0,
-                        BackSize1: 0,
-                        LayPrice1: 0,
-                        LaySize1: 0,
-                        SelectionId: odd.SelectionId,
-                        Question_id: odd.Question_id,
-                        Option_id: odd.Option_id,
-                        min: odd.min,
-                        max: odd.max,
-                        isSuspended: true
-                    }));
+                // if (data.success && data.data) {
+                // Group odds by RunnerName
+                const groupedOdds = data.data.reduce((acc: { [key: string]: GroupedFancyOdd }, curr: FancyApiMapping) => {
+                    const key = `${curr.Question_id}-${curr.RunnerName}`;
 
-                    setFancyOdds(initialFancyOdds);
-                    setFancyOddsMappings(data.data);
-                }
+                    if (!acc[key]) {
+                        acc[key] = {
+                            RunnerName: curr.RunnerName,
+                            Match_id: curr.Match_id,
+                            Question_id: curr.Question_id,
+                            back: null,
+                            lay: null
+                        };
+                    }
+
+                    if (curr.Option_name.toLowerCase() === 'back') {
+                        acc[key].back = {
+                            Option_id: curr.Option_id,
+                            Option_name: curr.Option_name,
+                            SelectionId: curr.SelectionId,
+                            min: curr.min,
+                            max: curr.max,
+                            price: 0,
+                            size: 0
+                        };
+                    } else if (curr.Option_name.toLowerCase() === 'lay') {
+                        acc[key].lay = {
+                            Option_id: curr.Option_id,
+                            Option_name: curr.Option_name,
+                            SelectionId: curr.SelectionId,
+                            min: curr.min,
+                            max: curr.max,
+                            price: 0,
+                            size: 0
+                        };
+                    }
+
+                    return acc;
+                }, {});
+
+                setFancyOddsMappings(Object.values(groupedOdds));
+                // }
             } catch (error) {
-                console.error("Error fetching initial fancy odds:", error);
+                console.error("Error fetching fancy odds:", error);
             }
         };
 
         fetchInitialFancyOdds();
     }, [eventId, marketId]);
 
-    useEffect(() => {
-        const fetchRealtimeFancyOdds = async () => {
-            if (!eventId || !marketId) return;
+    const updateFancyOdds = async () => {
+        if (!eventId || !marketId) return;
 
-            try {
-                const response = await fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`);
-                const data = await response.json();
+        try {
+            const response = await fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`);
+            const responseData = await response.json();
 
-                if (data?.data) {
-                    handleFancyOddsUpdate(data.data);
-                }
-            } catch (error) {
-                console.error("Error fetching realtime fancy odds:", error);
+            if (responseData?.data) {
+                // Update the fancy odds state with the new data
+                setFancyOddsMappings(prevOdds => {
+                    return prevOdds.map(odd => {
+                        // Find matching runner by RunnerName
+                        const realtimeOdd = responseData.data.find(
+                            (r: any) => r.RunnerName === odd.RunnerName
+                        );
+
+                        if (realtimeOdd) {
+                            return {
+                                ...odd,
+                                back: odd.back ? {
+                                    ...odd.back,
+                                    price: realtimeOdd.BackPrice1,
+                                    size: realtimeOdd.BackSize1,
+                                    isSuspended: realtimeOdd.GameStatus === 'SUSPENDED'
+                                } : null,
+                                lay: odd.lay ? {
+                                    ...odd.lay,
+                                    price: realtimeOdd.LayPrice1,
+                                    size: realtimeOdd.LaySize1,
+                                    isSuspended: realtimeOdd.GameStatus === 'SUSPENDED'
+                                } : null
+                            };
+                        }
+                        return odd;
+                    });
+                });
             }
-        };
+        } catch (error) {
+            console.error("Error updating fancy odds:", error);
+        }
+    };
 
-        const interval = setInterval(fetchRealtimeFancyOdds, 1000);
+    useEffect(() => {
+        const interval = setInterval(updateFancyOdds, 1000);
         return () => clearInterval(interval);
-    },);
+    }, [eventId, marketId]);
 
     const handleStakeButton = (type: "min" | "max" | "predefined", value?: number) => {
         if (type === "predefined" && value) {
@@ -754,47 +842,45 @@ export default function LiveMatch() {
         }
     };
 
-    const handleFancyOddsClick = (
-        odd: FancyOdds,
-        type: "no" | "yes",
-        section: "fancy"
-    ) => {
-        setBetError(null);
+    const handleFancyBet = (odd: GroupedFancyOdd, type: "no" | "yes") => {
+        const option = type === "no" ? odd.back : odd.lay;
+        if (!option) return;
 
-        try {
-            const isSuspended = !odd.BackPrice1 || !odd.LayPrice1;
-            if (isSuspended || !isMatchLive) {
-                setBetError("This market is currently suspended");
-                return;
-            }
+        setSelectedBet({
+            name: odd.RunnerName,
+            type: type.toUpperCase(),
+            section: "FANCY",
+            betoption_id: option.Option_id,
+            betquestion_id: odd.Question_id,
+            match_id: parseInt(odd.Match_id, 10)
+        });
 
-            const price = type === "no" ? odd.BackPrice1 : odd.LayPrice1;
-            const oddsValue = price?.toFixed(2) || "0";
-            const betData = fancyOddsMappings.find(data => data.RunnerName === odd.RunnerName);
+        setSelectedOdds(option.price.toFixed(2));
+        setSelectedStake(MIN_STAKE.toString());
 
-            if (!betData) {
-                setBetError("Unable to place bet at this time");
-                return;
-            }
+        if (isMobile) {
+            setShowMobileBetForm(true);
+        }
+    };
 
-            setSelectedBet({
-                name: betData.RunnerName,
-                type: type.toUpperCase(),
-                section: section.toUpperCase(),
-                betoption_id: betData.Option_id,
-                betquestion_id: betData.Question_id,
-                match_id: parseInt(betData.Match_id, 10)
-            });
+    const handleBookmakerBet = (marketId: string, eventId: string, selectionId: string, type: "back" | "lay", odds: number) => {
+        const bookmakerData = matchApiData.find(data => data.SelectionId === selectionId);
+        if (!bookmakerData) return;
 
-            setSelectedOdds(oddsValue);
-            setSelectedStake(MIN_STAKE.toString());
+        setSelectedBet({
+            name: bookmakerData.RunnerName,
+            type: type.toUpperCase(),
+            section: "BOOKMAKER",
+            betoption_id: bookmakerData.Option_id,
+            betquestion_id: bookmakerData.Question_id,
+            match_id: parseInt(bookmakerData.Match_id, 10)
+        });
 
-            if (isMobile) {
-                setShowMobileBetForm(true);
-            }
-        } catch (error) {
-            console.error("Error processing fancy odds:", error);
-            setBetError("Failed to process bet");
+        setSelectedOdds(odds.toFixed(2));
+        setSelectedStake(MIN_STAKE.toString());
+
+        if (isMobile) {
+            setShowMobileBetForm(true);
         }
     };
 
@@ -1143,61 +1229,61 @@ export default function LiveMatch() {
 
                             {expandedSections.fancy && (
                                 <div className="p-0">
-                                    {!isMatchLive ? (
-                                        <div className="text-center py-6 text-yellow-400">
-                                            Fancy betting is only available when the match is live
+                                    <div className="grid grid-cols-2 w-full">
+                                        <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
+                                            NO
                                         </div>
-                                    ) : (
-                                        <>
-                                            <div className="grid grid-cols-2 w-full">
-                                                <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
-                                                    NO (BACK)
-                                                </div>
-                                                <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
-                                                    YES (LAY)
-                                                </div>
-                                            </div>
+                                        <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
+                                            YES
+                                        </div>
+                                    </div>
 
-                                            {fancyOdds.map((odd, idx) => (
-                                                <div key={`${odd.RunnerName}-${idx}`} className="border-b border-purple-900 last:border-b-0">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="text-white font-bold pl-4 py-2 bg-[#231439] w-full flex justify-between pr-4">
-                                                            <span>{odd.RunnerName}</span>
-                                                            <span className="text-xs text-gray-400">
-                                                                Min: ₹{odd.min || '100'} | Max: ₹{odd.max || '25000'}
-                                                            </span>
-                                                        </div>
+                                    <div className="space-y-2">
+                                        {fancyOddsMappings.map((odd, idx) => {
+                                            const isSuspended = !odd.back?.price || !odd.lay?.price;
+
+                                            return (
+                                                <div key={`${odd.Question_id}-${idx}`} className="border-b border-purple-900 last:border-b-0">
+                                                    <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
+                                                        {odd.RunnerName}
                                                     </div>
-
-                                                    <div className="grid grid-cols-2 w-full relative">
-                                                        <div
-                                                            onClick={() => handleFancyOddsClick(odd, "no", "fancy")}
-                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] mr-2 ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#62abe0]' : ''}`}
-                                                        >
-                                                            <div className="text-white font-bold">{odd.BackPrice1 || '0.0'}</div>
-                                                            <div className="text-xs text-gray-200">{Number(odd.BackSize1 || 0).toLocaleString()}</div>
-                                                        </div>
-
-                                                        <div
-                                                            onClick={() => handleFancyOddsClick(odd, "yes", "fancy")}
-                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#ef8383]' : ''}`}
-                                                        >
-                                                            <div className="text-white font-bold">{odd.LayPrice1 || '0.0'}</div>
-                                                            <div className="text-xs text-gray-200">{Number(odd.LaySize1 || 0).toLocaleString()}</div>
-                                                        </div>
-
-                                                        {(odd.isSuspended || !isMatchLive) && (
+                                                    <div className="grid grid-cols-2 gap-2 p-2 relative">
+                                                        {isSuspended && (
                                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                                                                <span className="text-red-500 font-bold text-lg">
-                                                                    {odd.isSuspended ? "SUSPENDED" : "WAITING FOR LIVE"}
-                                                                </span>
+                                                                <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
                                                             </div>
                                                         )}
+                                                        {/* NO button */}
+                                                        <button
+                                                            onClick={() => !isSuspended && handleFancyBet(odd, "no")}
+                                                            disabled={isSuspended}
+                                                            className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            <span className="text-white font-bold text-lg">
+                                                                {odd.back?.price?.toFixed(2) || "0.00"}
+                                                            </span>
+                                                            <span className="text-xs text-gray-200">
+                                                                {odd.back?.size?.toLocaleString() || "0"}
+                                                            </span>
+                                                        </button>
+                                                        {/* YES button */}
+                                                        <button
+                                                            onClick={() => !isSuspended && handleFancyBet(odd, "yes")}
+                                                            disabled={isSuspended}
+                                                            className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            <span className="text-white font-bold text-lg">
+                                                                {odd.lay?.price?.toFixed(2) || "0.00"}
+                                                            </span>
+                                                            <span className="text-xs text-gray-200">
+                                                                {odd.lay?.size?.toLocaleString() || "0"}
+                                                            </span>
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </>
-                                    )}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1253,6 +1339,7 @@ export default function LiveMatch() {
                                             </div>
                                         </div>
                                     )}
+
                                     <Input
                                         type="number"
                                         value={selectedOdds}
@@ -1268,7 +1355,7 @@ export default function LiveMatch() {
                                         placeholder="Stakes"
                                     />
                                     <div className="grid grid-cols-4 gap-2 mb-2">
-                                        {predefinedStakes[0].map((stake, index) => (
+                                        {PREDEFINED_STAKES.low.map((stake, index) => (
                                             <Button
                                                 key={`stake-${index}`}
                                                 onClick={() => handleStakeButton("predefined", stake)}
@@ -1279,7 +1366,7 @@ export default function LiveMatch() {
                                         ))}
                                     </div>
                                     <div className="grid grid-cols-4 gap-2 mb-2">
-                                        {predefinedStakes[1].map((stake, index) => (
+                                        {PREDEFINED_STAKES.high.map((stake, index) => (
                                             <Button
                                                 key={`stake-${index}`}
                                                 onClick={() => handleStakeButton("predefined", stake)}
@@ -1289,43 +1376,44 @@ export default function LiveMatch() {
                                             </Button>
                                         ))}
                                     </div>
-                                    <div className="flex gap-2"></div>
-                                    <Button
-                                        onClick={() => handleStakeButton("min")}
-                                        className="bg-yellow-500 hover:bg-yellow-600 text-black flex-1 text-sm"
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={() => handleStakeButton("min")}
+                                            className="bg-yellow-500 hover:bg-yellow-600 text-black flex-1 text-sm"
+                                        >
+                                            MIN
+                                        </Button>
+                                        <Button
+                                            onClick={() => handleStakeButton("max")}
+                                            className="bg-green-600 hover:bg-green-700 text-white flex-1 text-sm"
+                                        >
+                                            MAX
+                                        </Button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="default"
+                                            className="bg-[#3a2255] text-white flex-1 text-sm"
+                                            onClick={handleClearStake}
+                                        >
+                                            Clear
+                                        </Button>
+                                        <Button
+                                            variant="default"
+                                            className="bg-green-600 text-white flex-1 text-sm"
+                                            onClick={handlePlaceBet}
+                                            disabled={!selectedBet || !selectedOdds || !selectedStake}
+                                        >
+                                            Place Bet
+                                        </Button>
+                                    </div>
+                                    <button
+                                        onClick={(e) => handleCashoutClick(e, "match-odds")}
+                                        className="w-full bg-yellow-500 text-black mt-4 py-2 rounded"
                                     >
-                                        MIN
-                                    </Button>
-                                    <Button
-                                        onClick={() => handleStakeButton("max")}
-                                        className="bg-green-600 hover:bg-green-700 text-white flex-1 text-sm"
-                                    >
-                                        MAX
-                                    </Button>
+                                        Cashout Match
+                                    </button>
                                 </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="default"
-                                        className="bg-[#3a2255] text-white flex-1 text-sm"
-                                        onClick={handleClearStake}
-                                    >
-                                        Clear
-                                    </Button>
-                                    <Button
-                                        variant="default"
-                                        className="bg-green-600 text-white flex-1 text-sm"
-                                        onClick={handlePlaceBet}
-                                        disabled={!selectedBet || !selectedOdds || !selectedStake}
-                                    >
-                                        Place Bet
-                                    </Button>
-                                </div>
-                                <button
-                                    onClick={(e) => handleCashoutClick(e, "match-odds")}
-                                    className="w-full bg-yellow-500 text-black mt-4 py-2 rounded"
-                                >
-                                    Cashout Match
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -1343,119 +1431,120 @@ export default function LiveMatch() {
                         <div className="bg-[#2a1a47] rounded-t-lg p-4 shadow-xl border border-purple-900 border-b-0">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex-1">
-                                    <div className="flex justify-between items-center"></div>
-                                    <h3 className="text-white text-lg">{selectedBet?.name || "Select a bet"}</h3>
-                                    <button
-                                        onClick={() => {
-                                            setShowMobileBetForm(false)
-                                            setSelectedBet(null)
-                                            handleClearStake()
-                                        }}
-                                        className="text-gray-400 hover:text-white p-2"
-                                    >
-                                        ✕
-                                    </button>
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-white text-lg">{selectedBet?.name || "Select a bet"}</h3>
+                                        <button
+                                            onClick={() => {
+                                                setShowMobileBetForm(false)
+                                                setSelectedBet(null)
+                                                handleClearStake()
+                                            }}
+                                            className="text-gray-400 hover:text-white p-2"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    {selectedBet && (
+                                        <div className="flex justify-between items-center mt-1">
+                                            <p className="text-white text-sm">
+                                                {selectedBet.type} @ {selectedOdds}
+                                            </p>
+                                            <p className="text-white text-sm">Balance: ₹{Number.parseInt(userBalance).toLocaleString()}</p>
+                                        </div>
+                                    )}
                                 </div>
-                                {selectedBet && (
-                                    <div className="flex justify-between items-center mt-1">
-                                        <p className="text-white text-sm">
-                                            {selectedBet.type} @ {selectedOdds}
-                                        </p>
-                                        <p className="text-white text-sm">Balance: ₹{Number.parseInt(userBalance).toLocaleString()}</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {calculateReturns() && (
+                                    <div className="bg-[#3a2255] rounded-lg p-4 border border-purple-900 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white">Confirm Bet Before Placing</span>
+                                            <span className="text-white font-bold">
+                                                {selectedBet?.type}@{calculateReturns()?.odds.toFixed(2)}
+                                            </span>
+                                        </div>
+
+                                        <div className="text-green-400 font-medium">
+                                            Potential return : +₹{calculateReturns()?.potentialReturn.toFixed(0)}
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-purple-800">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
+                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
+                                                <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
+                                                    {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
-                            </div>
-                        </div>
 
-                        <div className="space-y-4">
-                            {calculateReturns() && (
-                                <div className="bg-[#3a2255] rounded-lg p-4 border border-purple-900 space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-white">Confirm Bet Before Placing</span>
-                                        <span className="text-white font-bold">
-                                            {selectedBet?.type}@{calculateReturns()?.odds.toFixed(2)}
-                                        </span>
-                                    </div>
+                                <Input
+                                    type="number"
+                                    value={selectedOdds}
+                                    readOnly
+                                    className="w-full bg-[#3a2255] text-white border-0 rounded-lg text-lg h-12"
+                                />
+                                <Input
+                                    type="number"
+                                    value={selectedStake}
+                                    onChange={(e) => setSelectedStake(e.target.value)}
+                                    placeholder="Stakes"
+                                    className="w-full bg-[#3a2255] text-white border-0 rounded-lg text-lg h-12"
+                                />
 
-                                    <div className="text-green-400 font-medium">
-                                        Potential return : +₹{calculateReturns()?.potentialReturn.toFixed(0)}
-                                    </div>
-
-                                    <div className="space-y-2 pt-2 border-t border-purple-800">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-300">{calculateReturns()?.selectedTeam}</span>
-                                            <span className={`font-medium ${calculateReturns()?.isBack ? 'text-green-400' : 'text-red-400'}`}>
-                                                {calculateReturns()?.isBack ? '+' : '-'}₹{Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-300">{calculateReturns()?.otherTeam}</span>
-                                            <span className={`font-medium ${calculateReturns()?.isBack ? 'text-red-400' : 'text-green-400'}`}>
-                                                {calculateReturns()?.isBack ? '-' : '+'}₹{Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-4 gap-3">
+                                    {PREDEFINED_STAKES.low.concat(PREDEFINED_STAKES.high).map((stake, index) => (
+                                        <button
+                                            key={index}
+                                            className="bg-[#4c2a70] text-white py-3 px-2 rounded-lg text-sm font-medium hover:bg-[#5c3a80] transition-colors"
+                                            onClick={() => handleStakeButton("predefined", stake)}
+                                        >
+                                            {stake.toLocaleString()}
+                                        </button>
+                                    ))}
                                 </div>
-                            )}
-                            <Input
-                                type="number"
-                                value={selectedOdds}
-                                readOnly
-                                className="w-full bg-[#3a2255] text-white border-0 rounded-lg text-lg h-12"
-                            />
 
-                            <Input
-                                type="number"
-                                value={selectedStake}
-                                onChange={(e) => setSelectedStake(e.target.value)}
-                                placeholder="Stakes"
-                                className="w-full bg-[#3a2255] text-white border-0 rounded-lg text-lg h-12"
-                            />
-
-                            <div className="grid grid-cols-4 gap-3">
-                                {predefinedStakes.flat().map((stake, index) => (
+                                <div className="grid grid-cols-2 gap-3">
                                     <button
-                                        key={index}
-                                        className="bg-[#4c2a70] text-white py-3 px-2 rounded-lg text-sm font-medium hover:bg-[#5c3a80] transition-colors"
-                                        onClick={() => handleStakeButton("predefined", stake)}
+                                        className="bg-yellow-500 text-black py-3 rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
+                                        onClick={() => handleStakeButton("min")}
                                     >
-                                        {stake.toLocaleString()}
+                                        MIN
                                     </button>
-                                ))}
-                            </div>
+                                    <button
+                                        className="bg-green-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                                        onClick={() => handleStakeButton("max")}
+                                    >
+                                        MAX
+                                    </button>
+                                </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    className="bg-yellow-500 text-black py-3 rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
-                                    onClick={() => handleStakeButton("min")}
-                                >
-                                    MIN
-                                </button>
-                                <button
-                                    className="bg-green-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                                    onClick={() => handleStakeButton("max")}
-                                >
-                                    MAX
-                                </button>
-                            </div>
+                                {betError && <p className="text-red-500 text-sm text-center">{betError}</p>}
 
-                            {betError && <p className="text-red-500 text-sm text-center">{betError}</p>}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    className="bg-[#3a2255] text-white py-3 rounded-lg text-sm font-medium hover:bg-[#4c2a70] transition-colors"
-                                    onClick={handleClearStake}
-                                >
-                                    Clear
-                                </button>
-                                <button
-                                    className="bg-green-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={handlePlaceBet}
-                                    disabled={!selectedStake || Number(selectedStake) < MIN_STAKE || Number(selectedStake) > MAX_STAKE}
-                                >
-                                    Place Bet
-                                </button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        className="bg-[#3a2255] text-white py-3 rounded-lg text-sm font-medium hover:bg-[#4c2a70] transition-colors"
+                                        onClick={handleClearStake}
+                                    >
+                                        Clear
+                                    </button>
+                                    <button
+                                        className="bg-green-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={handlePlaceBet}
+                                        disabled={!selectedStake || Number(selectedStake) < MIN_STAKE || Number(selectedStake) > MAX_STAKE}
+                                    >
+                                        Place Bet
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
