@@ -435,32 +435,32 @@ export default function LiveMatch() {
 
                 const data = await response.json();
 
-                if (data.data) {
-                    // Create a mapping of SelectionId to prediction data
-                    const oddsMapping: OddsMapping = {};
-                    data.data.forEach((odd: PredictionData) => {
-                        oddsMapping[odd.SelectionId] = odd;
-                    });
+                // if (data.data) {
+                // Create a mapping of SelectionId to prediction data
+                const oddsMapping: OddsMapping = {};
+                data.data.forEach((odd: PredictionData) => {
+                    oddsMapping[odd.SelectionId] = odd;
+                });
 
-                    // Store the mapping for later use
-                    setMatchApiData(data.data);
+                // Store the mapping for later use
+                setMatchApiData(data.data);
 
-                    setEventOdds({
-                        eventName: data.data[0]?.RunnerName || "",
-                        marketId: marketId,
-                        runners: data.data.map(odd => ({
-                            selectionId: odd.SelectionId,
-                            runner: odd.Option_name,
-                            Option_id: odd.Option_id,
-                            Question_id: odd.Question_id,
-                            Match_id: odd.Match_id,
-                            ex: {
-                                availableToBack: [{ price: 0, size: 0 }],
-                                availableToLay: [{ price: 0, size: 0 }]
-                            }
-                        }))
-                    });
-                }
+                setEventOdds({
+                    eventName: data.data[0]?.RunnerName || "",
+                    marketId: marketId,
+                    runners: data.data.map(odd => ({
+                        selectionId: odd.SelectionId,
+                        runner: odd.Option_name,
+                        Option_id: odd.Option_id,
+                        Question_id: odd.Question_id,
+                        Match_id: odd.Match_id,
+                        ex: {
+                            availableToBack: [{ price: 0, size: 0 }],
+                            availableToLay: [{ price: 0, size: 0 }]
+                        }
+                    }))
+                });
+                // }
             } catch (error) {
                 console.error('Error fetching initial odds:', error);
                 setError('Failed to load initial odds data');
@@ -636,6 +636,76 @@ export default function LiveMatch() {
         const interval = setInterval(updateFancyOdds, 1000);
         return () => clearInterval(interval);
     }, [eventId, marketId]);
+
+    // Add new effect for bookmaker odds initialization
+    useEffect(() => {
+        const fetchInitialBookmakerOdds = async () => {
+            if (!eventId || !marketId) return;
+
+            try {
+                const response = await fetch('https://book2500.funzip.in/api/bookmaker-odds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_id: eventId, market_id: marketId })
+                });
+
+                const data = await response.json();
+
+                // if (data.success && data.data) {
+                // Store the mapping for later use
+                setBookmakerMarket(data.data);
+                // }
+            } catch (error) {
+                console.error('Error fetching initial bookmaker odds:', error);
+                setError('Failed to load initial bookmaker data');
+            }
+        };
+
+        fetchInitialBookmakerOdds();
+    }, [eventId, marketId]);
+
+    // Update fetchBookmakerOdds function
+    const fetchBookmakerOdds = useCallback(async () => {
+        if (!eventId || !marketId) return;
+
+        try {
+            const response = await fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`);
+            const data = await response.json();
+
+            if (data?.data) {
+                const formattedBookmaker = {
+                    ...data.data,
+                    runners: data.data.runners.map((runner: any) => ({
+                        ...runner,
+                        ex: {
+                            availableToBack: runner.back?.map((b: any) => ({
+                                price: b.price1 || 0,
+                                size: parseFloat(b.size) || 0
+                            })) || [],
+                            availableToLay: runner.lay?.map((l: any) => ({
+                                price: l.price1 || 0,
+                                size: parseFloat(l.size) || 0
+                            })) || []
+                        }
+                    }))
+                };
+                setBookmakerMarket(formattedBookmaker);
+            }
+        } catch (error) {
+            console.error('Error fetching real-time bookmaker odds:', error);
+        }
+    }, [eventId, marketId]);
+
+    useEffect(() => {
+        // Initial fetch
+        fetchBookmakerOdds();
+
+        // Set up polling interval
+        const interval = setInterval(fetchBookmakerOdds, 1000);
+
+        // Cleanup interval on unmount
+        return () => clearInterval(interval);
+    }, [fetchBookmakerOdds]);
 
     const handleStakeButton = (type: "min" | "max" | "predefined", value?: number) => {
         if (type === "predefined" && value) {
@@ -863,12 +933,23 @@ export default function LiveMatch() {
         }
     };
 
-    const handleBookmakerBet = (marketId: string, eventId: string, selectionId: string, type: "back" | "lay", odds: number) => {
-        const bookmakerData = matchApiData.find(data => data.SelectionId === selectionId);
+    const handleBookmakerBet = (runner: BookmakerRunner, type: "back" | "lay") => {
+        if (runner.status === "SUSPENDED") return;
+
+        const odds = type === "back"
+            ? runner.ex?.availableToBack?.[0]?.price
+            : runner.ex?.availableToLay?.[0]?.price;
+
+        if (!odds) return;
+
+        const bookmakerData = matchApiData.find(data =>
+            data.Option_name === runner.runnerName
+        );
+
         if (!bookmakerData) return;
 
         setSelectedBet({
-            name: bookmakerData.RunnerName,
+            name: runner.runnerName,
             type: type.toUpperCase(),
             section: "BOOKMAKER",
             betoption_id: bookmakerData.Option_id,
@@ -1020,7 +1101,7 @@ export default function LiveMatch() {
                             )}
                         </div>
 
-                        <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
+                        <div className="w-full h-[55px] bg-black rounded-lg overflow-hidden">
                             {liveMatchData?.iframeScore && (
                                 <iframe
                                     src={liveMatchData.iframeScore}
@@ -1159,8 +1240,8 @@ export default function LiveMatch() {
                                         </div>
                                     </div>
 
-                                    {(bookmakerMarket?.runners || []).map((runner, idx) => {
-                                        const isSuspended = runner.status === "SUSPENDED" || !runner.batb?.[0]?.[0] || !runner.batl?.[0]?.[0];
+                                    {bookmakerMarket?.runners?.map((runner, idx) => {
+                                        const isSuspended = runner.status === "SUSPENDED";
 
                                         return (
                                             <div key={idx} className="border-b border-purple-900">
@@ -1168,43 +1249,41 @@ export default function LiveMatch() {
                                                     {runner.runnerName}
                                                 </div>
                                                 <div className="grid grid-cols-6 w-full relative">
-                                                    {[2, 1, 0].map((i) => (
-                                                        <div
-                                                            key={`back-${i}`}
-                                                            onClick={() => !isSuspended && handleOddsClick(runner, "back", "bookmaker")}
-                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
-                                                                ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#72bbee]`}
-                                                        >
-                                                            <div className="font-bold text-black">
-                                                                {runner.batb?.[i]?.[0] || "0.0"}
-                                                            </div>
-                                                            <div className="text-[10px] text-black/75">
-                                                                {(Number(runner.batb?.[i]?.[1] || 0) / 1000).toFixed(1)}K
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {[0, 1, 2].map((i) => (
-                                                        <div
-                                                            key={`lay-${i}`}
-                                                            onClick={() => !isSuspended && handleOddsClick(runner, "lay", "bookmaker")}
-                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 
-                                                                ${!isSuspended ? "cursor-pointer" : "opacity-90"} bg-[#ff9393]`}
-                                                        >
-                                                            <div className="font-bold text-black">
-                                                                {runner.batl?.[i]?.[0] || "0.0"}
-                                                            </div>
-                                                            <div className="text-[10px] text-black/75">
-                                                                {(Number(runner.batl?.[i]?.[1] || 0) / 1000).toFixed(1)}K
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
                                                     {isSuspended && (
                                                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                             <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
                                                         </div>
                                                     )}
+                                                    {/* Back prices */}
+                                                    {[2, 1, 0].map((i) => (
+                                                        <div
+                                                            key={`back-${i}`}
+                                                            onClick={() => !isSuspended && handleBookmakerBet(runner, "back")}
+                                                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
+                                                        >
+                                                            <div className="text-white font-bold">
+                                                                {runner.ex?.availableToBack?.[i]?.price?.toFixed(2) || "0.0"}
+                                                            </div>
+                                                            <div className="text-xs text-gray-200">
+                                                                {runner.ex?.availableToBack?.[i]?.size?.toLocaleString() || "0"}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {/* Lay prices */}
+                                                    {[0, 1, 2].map((i) => (
+                                                        <div
+                                                            key={`lay-${i}`}
+                                                            onClick={() => !isSuspended && handleBookmakerBet(runner, "lay")}
+                                                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
+                                                        >
+                                                            <div className="text-white font-bold">
+                                                                {runner.ex?.availableToLay?.[i]?.price?.toFixed(2) || "0.0"}
+                                                            </div>
+                                                            <div className="text-xs text-gray-200">
+                                                                {runner.ex?.availableToLay?.[i]?.size?.toLocaleString() || "0"}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         );
@@ -1221,7 +1300,7 @@ export default function LiveMatch() {
                                     <h2 className="text-white font-bold">FANCY</h2>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">CASHOUT</div>
+                                    {/* <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">CASHOUT</div> */}
                                     <div className="text-white text-xs hidden sm:block">Min: 100 | Max: 250K</div>
                                     <div className="text-white">{expandedSections.fancy ? "▲" : "▼"}</div>
                                 </div>
