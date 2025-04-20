@@ -298,6 +298,28 @@ export default function LiveMatch() {
     const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
     const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>([]);
 
+    const handleFancyOddsUpdate = useCallback((realtimeOdds: any[]) => {
+        setFancyOdds(prevOdds => {
+            return prevOdds.map(odd => {
+                const updatedOdd = realtimeOdds.find(
+                    realOdd => realOdd.RunnerName === odd.RunnerName
+                );
+
+                if (updatedOdd) {
+                    return {
+                        ...odd,
+                        BackPrice1: updatedOdd.BackPrice1,
+                        BackSize1: updatedOdd.BackSize1,
+                        LayPrice1: updatedOdd.LayPrice1,
+                        LaySize1: updatedOdd.LaySize1,
+                        isSuspended: !updatedOdd.BackPrice1 || !updatedOdd.LayPrice1 || updatedOdd.GameStatus === 'SUSPENDED'
+                    };
+                }
+                return odd;
+            });
+        });
+    }, []);
+
     useEffect(() => {
         if (isBrowser) {
             const checkMobile = () => {
@@ -411,7 +433,7 @@ export default function LiveMatch() {
         if (!eventId || !marketId || !eventOdds.runners.length) return;
 
         try {
-            const response = await fetch(`http://51.21.182.1:3000/fetch-event-odds/${eventId}/${marketId}`);
+            const response = await fetch(`https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`);
             const data: RealTimeOdds = await response.json();
 
             if (data?.data?.runners) {
@@ -512,21 +534,11 @@ export default function LiveMatch() {
             if (!eventId || !marketId) return;
 
             try {
-                const response = await fetch(`http://51.21.182.1:3000/fetch-fancy-odds/${eventId}/${marketId}`);
+                const response = await fetch(`https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`);
                 const data = await response.json();
 
                 if (data?.data) {
-                    setFancyOdds(data.data.map((odd: any) => ({
-                        RunnerName: odd.RunnerName,
-                        BackPrice1: odd.BackPrice1,
-                        BackSize1: odd.BackSize1,
-                        LayPrice1: odd.LayPrice1,
-                        LaySize1: odd.LaySize1,
-                        SelectionId: odd.SelectionId,
-                        isSuspended: !odd.BackPrice1 || !odd.LayPrice1 || odd.GameStatus === 'SUSPENDED',
-                        min: odd.min,
-                        max: odd.max
-                    })));
+                    handleFancyOddsUpdate(data.data);
                 }
             } catch (error) {
                 console.error("Error fetching realtime fancy odds:", error);
@@ -687,47 +699,27 @@ export default function LiveMatch() {
         try {
             let isSuspended = false;
             let oddsValue = "";
-            let mapping = null;
+            let betData = null;
 
-            if (section === "match") {
-                mapping = matchApiData.find(data => data.Option_name === runner.runner);
-            } else if (section === "bookmaker") {
-                mapping = matchApiData.find(data => data.Option_name === (runner as BookmakerRunner).runnerName);
-            } else if (section === "fancy") {
-                mapping = fancyOddsMappings.find(data => data.RunnerName === (runner as FancyOdds).RunnerName);
-            }
-
-            if (!mapping) {
-                setBetError("Unable to find betting options for this selection");
-                return;
-            }
-
+            // Get odds and check suspension
             if (section === "fancy" && isFancyRunner(runner)) {
                 isSuspended = !runner.BackPrice1 || !runner.LayPrice1;
-
                 const price = type === "no" ? runner.BackPrice1 : runner.LayPrice1;
-                if (!price || price <= 0) {
-                    setBetError("Invalid odds data for fancy bet");
+                oddsValue = price?.toFixed(2) || "0";
+                betData = fancyOddsMappings.find(data => data.RunnerName === runner.RunnerName);
+            } else if (section === "match" && isMatchRunner(runner)) {
+                if (!runner.ex) return;
+                const odds = type === "back" ? runner.ex.availableToBack?.[0] : runner.ex.availableToLay?.[0];
+                if (!odds || typeof odds.price !== "number" || odds.price <= 0) {
+                    setBetError("Invalid odds data");
                     return;
                 }
-                oddsValue = price.toFixed(2);
-
-                type = type === "no" ? "back" : "lay";
-            } else if (section === "match" && isMatchRunner(runner)) {
-                if (!runner.ex) return
-                const odds = type === "back" ? runner.ex.availableToBack?.[0] : runner.ex.availableToLay?.[0]
-                if (!odds || typeof odds.price !== "number" || odds.price <= 0) {
-                    setBetError("Invalid odds data for match bet")
-                    return
-                }
-                oddsValue = odds.price.toFixed(2)
+                oddsValue = odds.price.toFixed(2);
+                betData = matchApiData.find(data => data.Option_name === runner.runner);
             } else if (section === "bookmaker" && isBookmakerRunner(runner)) {
-                const price = type === "back" ? runner.batb?.[0]?.[0] : runner.batl?.[0]?.[0]
-                if (!price || price <= 0) {
-                    setBetError("Invalid odds data for bookmaker bet")
-                    return
-                }
-                oddsValue = price.toFixed(2)
+                const price = type === "back" ? runner.batb?.[0]?.[0] : runner.batl?.[0]?.[0];
+                oddsValue = price?.toFixed(2) || "0";
+                betData = matchApiData.find(data => data.Option_name === runner.runnerName);
             }
 
             if (isSuspended) {
@@ -735,16 +727,19 @@ export default function LiveMatch() {
                 return;
             }
 
+            if (!betData) {
+                setBetError("Unable to place bet at this time");
+                return;
+            }
+
+            // Store minimal betting data
             setSelectedBet({
-                name: isMatchRunner(runner) ? runner.runner :
-                    isFancyRunner(runner) ? (runner as FancyOdds).RunnerName :
-                        isBookmakerRunner(runner) ? runner.runnerName : "",
+                name: betData.Option_name || betData.RunnerName,
                 type: type.toUpperCase(),
                 section: section.toUpperCase(),
-                selectionId: mapping.SelectionId,
-                betoption_id: mapping.Option_id,
-                betquestion_id: mapping.Question_id,
-                match_id: mapping.Match_id
+                betoption_id: betData.Option_id,
+                betquestion_id: betData.Question_id,
+                match_id: betData.Match_id
             });
 
             setSelectedOdds(oddsValue);
@@ -754,8 +749,8 @@ export default function LiveMatch() {
                 setShowMobileBetForm(true);
             }
         } catch (error) {
-            console.error("Error processing odds:", error);
-            setBetError("Failed to process odds. Please try again.");
+            console.error("Error processing odds");
+            setBetError("Failed to process bet");
         }
     };
 
@@ -1116,53 +1111,64 @@ export default function LiveMatch() {
 
                             {expandedSections.fancy && (
                                 <div className="p-0">
-                                    <div className="grid grid-cols-2 w-full">
-                                        <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
-                                            NO (BACK)
+                                    {!isMatchLive ? (
+                                        <div className="text-center py-6 text-yellow-400">
+                                            Fancy betting is only available when the match is live
                                         </div>
-                                        <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
-                                            YES (LAY)
-                                        </div>
-                                    </div>
-
-                                    {fancyOdds.map((odd, idx) => (
-                                        <div key={`${odd.RunnerName}-${idx}`} className="border-b border-purple-900 last:border-b-0">
-                                            <div className="flex justify-between items-center">
-                                                <div className="text-white font-bold pl-4 py-2 bg-[#231439] w-full flex justify-between pr-4">
-                                                    <span>{odd.RunnerName}</span>
-                                                    <span className="text-xs text-gray-400">
-                                                        Min: ₹{odd.min || '100'} | Max: ₹{odd.max || '25000'}
-                                                    </span>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-2 w-full">
+                                                <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
+                                                    NO (BACK)
+                                                </div>
+                                                <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
+                                                    YES (LAY)
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 w-full relative">
-                                                {/* NO (BACK) */}
-                                                <div
-                                                    onClick={() => !odd.isSuspended && handleOddsClick(odd, "no", "fancy")}
-                                                    className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] mr-2 ${!odd.isSuspended ? 'cursor-pointer hover:bg-[#62abe0]' : ''}`}
-                                                >
-                                                    <div className="text-white font-bold">{odd.BackPrice1 || '0.0'}</div>
-                                                    <div className="text-xs text-gray-200">{Number(odd.BackSize1 || 0).toLocaleString()}</div>
-                                                </div>
-
-                                                {/* YES (LAY) */}
-                                                <div
-                                                    onClick={() => !odd.isSuspended && handleOddsClick(odd, "yes", "fancy")}
-                                                    className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] ${!odd.isSuspended ? 'cursor-pointer hover:bg-[#ef8383]' : ''}`}
-                                                >
-                                                    <div className="text-white font-bold">{odd.LayPrice1 || '0.0'}</div>
-                                                    <div className="text-xs text-gray-200">{Number(odd.LaySize1 || 0).toLocaleString()}</div>
-                                                </div>
-
-                                                {odd.isSuspended && (
-                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                                                        <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
+                                            {fancyOdds.map((odd, idx) => (
+                                                <div key={`${odd.RunnerName}-${idx}`} className="border-b border-purple-900 last:border-b-0">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="text-white font-bold pl-4 py-2 bg-[#231439] w-full flex justify-between pr-4">
+                                                            <span>{odd.RunnerName}</span>
+                                                            <span className="text-xs text-gray-400">
+                                                                Min: ₹{odd.min || '100'} | Max: ₹{odd.max || '25000'}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
+
+                                                    <div className="grid grid-cols-2 w-full relative">
+                                                        {/* NO (BACK) */}
+                                                        <div
+                                                            onClick={() => handleFancyOddsClick(odd, "no", "fancy")}
+                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] mr-2 ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#62abe0]' : ''}`}
+                                                        >
+                                                            <div className="text-white font-bold">{odd.BackPrice1 || '0.0'}</div>
+                                                            <div className="text-xs text-gray-200">{Number(odd.BackSize1 || 0).toLocaleString()}</div>
+                                                        </div>
+
+                                                        {/* YES (LAY) */}
+                                                        <div
+                                                            onClick={() => handleFancyOddsClick(odd, "yes", "fancy")}
+                                                            className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#ef8383]' : ''}`}
+                                                        >
+                                                            <div className="text-white font-bold">{odd.LayPrice1 || '0.0'}</div>
+                                                            <div className="text-xs text-gray-200">{Number(odd.LaySize1 || 0).toLocaleString()}</div>
+                                                        </div>
+
+                                                        {/* Display suspension or match not live */}
+                                                        {(odd.isSuspended || !isMatchLive) && (
+                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                                                                <span className="text-red-500 font-bold text-lg">
+                                                                    {odd.isSuspended ? "SUSPENDED" : "WAITING FOR LIVE"}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
