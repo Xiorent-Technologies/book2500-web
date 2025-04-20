@@ -82,8 +82,6 @@ interface FancyOddsApiResponse {
 
 interface CashoutData {
     bet_invest_id: string;
-    match_id: string;
-    type: string;
 }
 
 interface CashoutResponse {
@@ -256,7 +254,6 @@ export async function executeCashout(data: CashoutData): Promise<CashoutResponse
             refund_amount: responseData.refund_amount,
             new_balance: responseData.new_balance
         };
-
     } catch (error) {
         console.error("Error processing cashout:", error);
         return {

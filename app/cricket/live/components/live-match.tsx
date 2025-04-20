@@ -1014,12 +1014,8 @@ export default function LiveMatch() {
             });
 
             const data = await response.json();
-            const pendingBets = data.logs?.filter(
-                (log: any) =>
-                    log.match_id === eventId &&
-                    log.status === '0' &&
-                    (!cashoutSelectionId || log.betquestion_id === cashoutSelectionId)
-            ) || [];
+            // Find the latest pending bet for the current match
+            const pendingBets = data.logs?.filter((log: any) => log.status === '0') || [];
 
             if (pendingBets.length === 0) {
                 toast.dismiss();
@@ -1027,15 +1023,10 @@ export default function LiveMatch() {
                 return;
             }
 
-            pendingBets.sort((a: any, b: any) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            );
-
+            // Get the most recent bet
             const latestBet = pendingBets[0];
             const result = await executeCashout({
-                bet_invest_id: latestBet.id,
-                match_id: eventId || "",
-                type: cashoutType
+                bet_invest_id: latestBet.id
             });
 
             toast.dismiss();
