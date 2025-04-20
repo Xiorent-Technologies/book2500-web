@@ -40,7 +40,7 @@ interface SelectedBet {
     selectionId?: string | number
     betoption_id: number
     betquestion_id: number
-    match_id: string
+    match_id: number
 }
 
 interface BookmakerMarket {
@@ -97,7 +97,7 @@ interface LiveMatchData {
 
 interface FancyOddsMapping {
     RunnerName: string;
-    Match_id: string;
+    Match_id: number;
     Question_id: number;
     Option_id: number;
     Option_name: string;
@@ -108,7 +108,7 @@ interface FancyOddsMapping {
 
 interface FancyOddApiData {
     RunnerName: string;
-    Match_id: string;
+    Match_id: number;
     Question_id: number;
     Option_id: number;
     Option_name: string;
@@ -141,7 +141,7 @@ interface EventOddsResponse {
     success: boolean;
     data: Array<{
         RunnerName: string;
-        Match_id: string;
+        Match_id: number;
         Question_id: number;
         Option_id: number;
         Option_name: string;
@@ -153,7 +153,7 @@ interface EventOddsResponse {
 
 interface EventOddApiData {
     RunnerName: string;
-    Match_id: string;
+    Match_id: number;
     Question_id: number;
     Option_id: number;
     Option_name: string;
@@ -170,7 +170,7 @@ interface CashoutDialogProps {
 
 interface PredictionData {
     RunnerName: string;
-    Match_id: string;
+    Match_id: number;
     Question_id: number;
     Option_id: number;
     Option_name: string;
@@ -489,7 +489,7 @@ export default function LiveMatch() {
                 const response = await fetch("https://book2500.funzip.in/api/fancy-odds", {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
+
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -547,7 +547,7 @@ export default function LiveMatch() {
 
         const interval = setInterval(fetchRealtimeFancyOdds, 1000);
         return () => clearInterval(interval);
-    }, [eventId, marketId]);
+    },);
 
     const handleStakeButton = (type: "min" | "max" | "predefined", value?: number) => {
         if (type === "predefined" && value) {
@@ -732,14 +732,14 @@ export default function LiveMatch() {
                 return;
             }
 
-            // Store minimal betting data
+            // Store minimal betting data with match_id as number
             setSelectedBet({
                 name: betData.Option_name || betData.RunnerName,
                 type: type.toUpperCase(),
                 section: section.toUpperCase(),
                 betoption_id: betData.Option_id,
                 betquestion_id: betData.Question_id,
-                match_id: betData.Match_id
+                match_id: parseInt(betData.Match_id, 10) // Convert to number
             });
 
             setSelectedOdds(oddsValue);
@@ -750,6 +750,50 @@ export default function LiveMatch() {
             }
         } catch (error) {
             console.error("Error processing odds");
+            setBetError("Failed to process bet");
+        }
+    };
+
+    const handleFancyOddsClick = (
+        odd: FancyOdds,
+        type: "no" | "yes",
+        section: "fancy"
+    ) => {
+        setBetError(null);
+
+        try {
+            const isSuspended = !odd.BackPrice1 || !odd.LayPrice1;
+            if (isSuspended || !isMatchLive) {
+                setBetError("This market is currently suspended");
+                return;
+            }
+
+            const price = type === "no" ? odd.BackPrice1 : odd.LayPrice1;
+            const oddsValue = price?.toFixed(2) || "0";
+            const betData = fancyOddsMappings.find(data => data.RunnerName === odd.RunnerName);
+
+            if (!betData) {
+                setBetError("Unable to place bet at this time");
+                return;
+            }
+
+            setSelectedBet({
+                name: betData.RunnerName,
+                type: type.toUpperCase(),
+                section: section.toUpperCase(),
+                betoption_id: betData.Option_id,
+                betquestion_id: betData.Question_id,
+                match_id: parseInt(betData.Match_id, 10)
+            });
+
+            setSelectedOdds(oddsValue);
+            setSelectedStake(MIN_STAKE.toString());
+
+            if (isMobile) {
+                setShowMobileBetForm(true);
+            }
+        } catch (error) {
+            console.error("Error processing fancy odds:", error);
             setBetError("Failed to process bet");
         }
     };
@@ -868,7 +912,6 @@ export default function LiveMatch() {
 
     return (
         <div className="min-h-screen bg-[#2a1a47]">
-            {/* Match Information */}
             <div className="bg-gradient-to-b from-[#3a2255] to-[#231439] p-4 border-b border-purple-800">
                 <div className="container mx-auto">
                     <div className="text-white text-xl font-bold mb-2">
@@ -891,7 +934,7 @@ export default function LiveMatch() {
                             )}
                         </div>
 
-                        <div className="w-full h-[55px] bg-black rounded-lg overflow-hidden">
+                        <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
                             {liveMatchData?.iframeScore && (
                                 <iframe
                                     src={liveMatchData.iframeScore}
@@ -908,17 +951,12 @@ export default function LiveMatch() {
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="container mx-auto">
-                <div className="flex flex-col lg:flex-row">
-                    {/* Match Sections */}
+            <div className="container mx-auto px-4">
+                <div className="flex flex-col lg:flex-row gap-4">
                     <div className="flex-1 pb-20 lg:pb-0">
-                        {/* Match Odds Section */}
-                        <div className="border-b border-purple-900">
-                            <div
-                                className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
-                                onClick={() => toggleSection("matchOdds")}
-                            >
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
+                                onClick={() => toggleSection("matchOdds")}>
                                 <div className="flex items-center">
                                     <div className="w-6 h-6 text-white flex items-center justify-center mr-2">★</div>
                                     <h2 className="text-white font-bold">MATCH ODDS</h2>
@@ -1003,12 +1041,9 @@ export default function LiveMatch() {
                             )}
                         </div>
 
-                        {/* Bookmaker Section */}
-                        <div className="border-b border-purple-900">
-                            <div
-                                className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
-                                onClick={() => toggleSection("bookmaker")}
-                            >
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
+                                onClick={() => toggleSection("bookmaker")}>
                                 <div className="flex items-center">
                                     <div className="w-6 h-6 text-white flex items-center justify-center mr-2">★</div>
                                     <h2 className="text-white font-bold">BOOKMAKER</h2>
@@ -1092,12 +1127,9 @@ export default function LiveMatch() {
                             )}
                         </div>
 
-                        {/* Fancy Section */}
-                        <div className="border-b border-purple-900">
-                            <div
-                                className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
-                                onClick={() => toggleSection("fancy")}
-                            >
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
+                                onClick={() => toggleSection("fancy")}>
                                 <div className="flex items-center">
                                     <div className="w-6 h-6 text-white flex items-center justify-center mr-2">★</div>
                                     <h2 className="text-white font-bold">FANCY</h2>
@@ -1138,7 +1170,6 @@ export default function LiveMatch() {
                                                     </div>
 
                                                     <div className="grid grid-cols-2 w-full relative">
-                                                        {/* NO (BACK) */}
                                                         <div
                                                             onClick={() => handleFancyOddsClick(odd, "no", "fancy")}
                                                             className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] mr-2 ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#62abe0]' : ''}`}
@@ -1147,7 +1178,6 @@ export default function LiveMatch() {
                                                             <div className="text-xs text-gray-200">{Number(odd.BackSize1 || 0).toLocaleString()}</div>
                                                         </div>
 
-                                                        {/* YES (LAY) */}
                                                         <div
                                                             onClick={() => handleFancyOddsClick(odd, "yes", "fancy")}
                                                             className={`flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] ${!odd.isSuspended && isMatchLive ? 'cursor-pointer hover:bg-[#ef8383]' : ''}`}
@@ -1156,7 +1186,6 @@ export default function LiveMatch() {
                                                             <div className="text-xs text-gray-200">{Number(odd.LaySize1 || 0).toLocaleString()}</div>
                                                         </div>
 
-                                                        {/* Display suspension or match not live */}
                                                         {(odd.isSuspended || !isMatchLive) && (
                                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                                 <span className="text-red-500 font-bold text-lg">
@@ -1174,7 +1203,6 @@ export default function LiveMatch() {
                         </div>
                     </div>
 
-                    {/* Desktop Betting Panel */}
                     <div className="hidden lg:block w-[350px] sticky top-0 h-screen">
                         <div className="h-full p-4 overflow-y-auto">
                             <div className="bg-gradient-to-br from-[#231439] via-[#2a1a47] to-[#231439] rounded-lg p-4 shadow-xl border border-purple-900">
@@ -1304,7 +1332,6 @@ export default function LiveMatch() {
                 </div>
             </div>
 
-            {/* Mobile Betting Panel */}
             {isMobile && (
                 <div
                     className="fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300"
@@ -1435,7 +1462,6 @@ export default function LiveMatch() {
                 </div>
             )}
 
-            {/* Mobile Bet Button */}
             {isMobile && selectedBet && !showMobileBetForm && (
                 <div className="fixed bottom-4 right-4 z-40">
                     <Button
@@ -1447,7 +1473,6 @@ export default function LiveMatch() {
                 </div>
             )}
 
-            {/* Cashout Dialog */}
             <CashoutDialog
                 isOpen={showCashoutDialog}
                 onClose={() => setShowCashoutDialog(false)}
