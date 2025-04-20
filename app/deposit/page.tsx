@@ -47,7 +47,7 @@ export default function DepositPage() {
             if (data.success) {
                 setGateways(data.data.gateways || [])
             } else {
-                toast.error(data.message || "Failed to load payment gateways")
+                // toast.error(data.message || "Failed to load payment gateways")
             }
         } catch (error) {
             console.error("Error fetching gateways:", error)

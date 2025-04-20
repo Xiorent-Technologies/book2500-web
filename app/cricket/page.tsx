@@ -98,7 +98,7 @@ export default function CricketPage() {
 
                         {/* Download App Card */}
                         <div className="bg-[#2D1A4A] rounded-lg p-6 text-center border border-purple-900">
-                            <Link href="/app-download">
+                            <a href="/book2500.apk" download="book2500.apk">
                                 <div className="flex flex-col items-center gap-3">
                                     <div className="text-[#FFD700] mb-2">
                                         <svg
@@ -132,7 +132,7 @@ export default function CricketPage() {
                                     <h3 className="text-xl text-[#FFD700] font-bold">DOWNLOAD</h3>
                                     <h3 className="text-xl text-[#FFD700] font-bold">OUR APP NOW!</h3>
                                 </div>
-                            </Link>
+                            </a>
                         </div>
 
                         {/* How To Play Card */}
