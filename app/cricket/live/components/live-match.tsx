@@ -712,22 +712,43 @@ export default function LiveMatch() {
       const data = await response.json();
 
       if (data?.data) {
+        // Map the bookmaker data correctly
         const formattedBookmaker = {
           ...data.data,
           runners: data.data.runners.map((runner: any) => ({
             ...runner,
+            runnerName: runner.runner || runner.runnerName || "Unknown", // Add fallback for runner name
             ex: {
-              availableToBack:
-                runner.back?.map((b: any) => ({
-                  price: b.price1 || 0,
-                  size: parseFloat(b.size) || 0,
-                })) || [],
-              availableToLay:
-                runner.lay?.map((l: any) => ({
-                  price: l.price1 || 0,
-                  size: parseFloat(l.size) || 0,
-                })) || [],
+              availableToBack: [
+                {
+                  price: parseFloat(runner.BackPrice1) || 0,
+                  size: parseFloat(runner.BackSize1) || 0,
+                },
+                {
+                  price: parseFloat(runner.BackPrice2) || 0,
+                  size: parseFloat(runner.BackSize2) || 0,
+                },
+                {
+                  price: parseFloat(runner.BackPrice3) || 0,
+                  size: parseFloat(runner.BackSize3) || 0,
+                },
+              ],
+              availableToLay: [
+                {
+                  price: parseFloat(runner.LayPrice1) || 0,
+                  size: parseFloat(runner.LaySize1) || 0,
+                },
+                {
+                  price: parseFloat(runner.LayPrice2) || 0,
+                  size: parseFloat(runner.LaySize2) || 0,
+                },
+                {
+                  price: parseFloat(runner.LayPrice3) || 0,
+                  size: parseFloat(runner.LaySize3) || 0,
+                },
+              ],
             },
+            status: runner.GameStatus || runner.status || "ACTIVE",
           })),
         };
         setBookmakerMarket(formattedBookmaker);
