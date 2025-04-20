@@ -1241,7 +1241,11 @@ export default function LiveMatch() {
                                     </div>
 
                                     {bookmakerMarket?.runners?.map((runner, idx) => {
-                                        const isSuspended = runner.status === "SUSPENDED";
+                                        const isSuspended = runner.status === "SUSPENDED" ||
+                                            !runner.ex?.availableToBack?.[0]?.price ||
+                                            !runner.ex?.availableToLay?.[0]?.price ||
+                                            runner.ex?.availableToBack?.[0]?.price === 0 ||
+                                            runner.ex?.availableToLay?.[0]?.price === 0;
 
                                         return (
                                             <div key={idx} className="border-b border-purple-900">
