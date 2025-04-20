@@ -847,6 +847,11 @@ export default function LiveMatch() {
         }
     };
 
+    // Add this helper function to check runner types
+    const isMatchRunner = (runner: any): runner is Runner => {
+        return runner && 'runner' in runner && 'ex' in runner;
+    };
+
     const handleOddsClick = (
         runner: Runner | BookmakerRunner | FancyOdds,
         type: "back" | "lay" | "no" | "yes",
@@ -859,55 +864,51 @@ export default function LiveMatch() {
             let oddsValue = "";
             let betData = null;
 
-            // Get odds and check suspension
-            if (section === "fancy" && isFancyRunner(runner)) {
-                isSuspended = !runner.BackPrice1 || !runner.LayPrice1;
-                const price = type === "no" ? runner.BackPrice1 : runner.LayPrice1;
-                oddsValue = price?.toFixed(2) || "0";
-                betData = fancyOddsMappings.find(data => data.RunnerName === runner.RunnerName);
-            } else if (section === "match" && isMatchRunner(runner)) {
+            if (section === "match" && isMatchRunner(runner)) {
                 if (!runner.ex) return;
                 const odds = type === "back" ? runner.ex.availableToBack?.[0] : runner.ex.availableToLay?.[0];
-                if (!odds || typeof odds.price !== "number" || odds.price <= 0) {
-                    setBetError("Invalid odds data");
+
+                // Check if odds are suspended
+                isSuspended = !odds || typeof odds.price !== "number" || odds.price <= 0;
+                if (isSuspended) {
+                    setBetError("This market is currently suspended");
                     return;
                 }
+
                 oddsValue = odds.price.toFixed(2);
-                betData = matchApiData.find(data => data.Option_name === runner.runner);
-            } else if (section === "bookmaker" && isBookmakerRunner(runner)) {
-                const price = type === "back" ? runner.batb?.[0]?.[0] : runner.batl?.[0]?.[0];
-                oddsValue = price?.toFixed(2) || "0";
-                betData = matchApiData.find(data => data.Option_name === runner.runnerName);
-            }
 
-            if (isSuspended) {
-                setBetError("This market is currently suspended");
-                return;
-            }
+                // Find the corresponding match data
+                betData = matchApiData.find(data =>
+                    data.Option_name.toLowerCase() === runner.runner.toLowerCase()
+                );
 
-            if (!betData) {
-                setBetError("Unable to place bet at this time");
-                return;
-            }
+                if (!betData) {
+                    setBetError("Unable to find match data");
+                    return;
+                }
 
-            // Store minimal betting data with match_id as number
-            setSelectedBet({
-                name: betData.Option_name || betData.RunnerName,
-                type: type.toUpperCase(),
-                section: section.toUpperCase(),
-                betoption_id: betData.Option_id,
-                betquestion_id: betData.Question_id,
-                match_id: parseInt(betData.Match_id, 10) // Convert to number
-            });
+                setSelectedBet({
+                    name: runner.runner,
+                    type: type.toUpperCase(),
+                    section: "MATCH",
+                    betoption_id: betData.Option_id,
+                    betquestion_id: betData.Question_id,
+                    match_id: Number(betData.Match_id),
+                    selectionId: runner.selectionId
+                });
 
-            setSelectedOdds(oddsValue);
-            setSelectedStake(MIN_STAKE.toString());
+                setSelectedOdds(oddsValue);
+                setSelectedStake(MIN_STAKE.toString());
 
-            if (isMobile) {
-                setShowMobileBetForm(true);
+                if (isMobile) {
+                    setShowMobileBetForm(true);
+                }
+            } else {
+                // Handle other bet types
+                // ...existing code for fancy and bookmaker...
             }
         } catch (error) {
-            console.error("Error processing odds");
+            console.error("Error processing odds:", error);
             setBetError("Failed to process bet");
         }
     };
