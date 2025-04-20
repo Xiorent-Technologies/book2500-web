@@ -29,6 +29,7 @@ class FancyMappingController extends GetxController {
   }
 
   Future<void> fetchBookmakerMappings() async {
+    print('fetching bookmaker mappings');
     if (_currentEventId == null || _currentMarketId == null) {
       _error.value = 'Event ID and Market ID are required';
       return;
@@ -46,6 +47,7 @@ class FancyMappingController extends GetxController {
           'market_id': _currentMarketId,
         }),
       );
+      print('bookmaker mapping ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -138,7 +140,7 @@ class FancyMappingController extends GetxController {
       _error.value = null;
 
       final response = await http.post(
-        Uri.parse('https://book2500.in/api/fancy-odds'),
+        Uri.parse('https://book2500.funzip.in/api/fancy-odds'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'event_id': _currentEventId,

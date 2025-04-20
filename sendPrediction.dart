@@ -27,17 +27,22 @@ Future<void> sendPrediction(
         'market_id': marketId, //string
         'event_id': eventId, //string
         // 'game_id': '4', //string
-        'invested_amount': stake, //double
-        "RunnerName": mapped.first.runnerName,
-        "Match_id": mapped.first.matchId,
-        "Question_id": mapped.first.questionId,
-        "Option_id": mapped.first.optionId,
-        "Option_name": mapped.first.optionName,
-        'ratio': odds, //double
+        'invest_amount': stake, //double
+        "RunnerName": mapped?.first.runnerName,
+        "match_id": mapped?.first.matchId,
+        "betquestion_id": mapped?.first.questionId,
+        "betoption_id": mapped?.first.optionId,
+        "Option_name": mapped?.first.optionName,
+        'ratio': odds.toString(), //double
         'selection_id': selectionId, //string
         'type': type, //string
         'is_back': isBack, //bool
-        'level': level //int
+        'level': level //int,
+        //fixed
+        // ,
+        // "betoption_id": 1153,
+        // "betquestion_id": 1144,
+        // "match_id": 917
       };
     } else if (type == 'bookmaker-odds') {
       final mapped = mapping_controller.getBookmakerBySelectionId(selectionId);
@@ -45,17 +50,22 @@ Future<void> sendPrediction(
         'market_id': marketId, //string
         'event_id': eventId, //string
         // 'game_id': '4', //string
-        'invested_amount': stake, //double
+        'invest_amount': stake, //double
         "RunnerName": mapped?.runnerName,
-        "Match_id": mapped?.matchId,
-        "Question_id": mapped?.questionId,
-        "Option_id": mapped?.optionId,
+        "match_id": mapped?.matchId,
+        "betquestion_id": mapped?.questionId,
+        "betoption_id": mapped?.optionId,
         "Option_name": mapped?.optionName,
-        'ratio': odds, //double
+        'ratio': odds.toString(), //double
         'selection_id': selectionId, //string
         'type': type, //string
         'is_back': isBack, //bool
-        'level': level //int
+        'level': level //int,
+        , //fixed
+
+        // "betoption_id": 1153,
+        // "betquestion_id": 1144,
+        // "match_id": 917
       };
     } else {
       final mapped = mapping_controller.getMatchBySelectionId(selectionId);
@@ -63,23 +73,24 @@ Future<void> sendPrediction(
         'market_id': marketId, //string
         'event_id': eventId, //string
         // 'game_id': '4', //string
-        'invested_amount': stake, //double
+        'invest_amount': stake, //double
         "RunnerName": mapped?.runnerName,
-        "Match_id": mapped?.matchId,
-        "Question_id": mapped?.questionId,
-        "Option_id": mapped?.optionId,
+        "match_id": mapped?.matchId,
+        "betquestion_id": mapped?.questionId,
+        "betoption_id": mapped?.optionId,
         "Option_name": mapped?.optionName,
-        'ratio': odds, //double
+        'ratio': odds.toString(), //double
         'selection_id': selectionId, //string
         'type': type, //string
         'is_back': isBack, //bool
         'level': level //int
       };
     }
-
+    print('sending prediction ....');
     print('sending prediction $body');
     await BaseClient.safeApiCall(
       'https://book2500.funzip.in/api/prediction',
+      // 'https://webhook.site/b75b69b2-4fd2-49c9-9b57-ada0c5b8a440',
       RequestType.post,
       headers: {'Authorization': 'Bearer $token'},
       data: body,

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
@@ -18,7 +18,19 @@ export function HeroSlider() {
     const [loading, setLoading] = useState(true)
     const [touchStart, setTouchStart] = useState(0)
     const [touchEnd, setTouchEnd] = useState(0)
-    const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
+    // const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
+
+    const startAutoPlay = useCallback(() => {
+        if (slides.length === 0) return () => { };
+
+        const interval = setInterval(() => {
+            setCurrentSlide((current) =>
+                current === slides.length - 1 ? 0 : current + 1
+            );
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [slides.length]);
 
     useEffect(() => {
         // Fetch slider data
@@ -47,40 +59,16 @@ export function HeroSlider() {
     useEffect(() => {
         if (slides.length === 0) return
 
-        // Start autoplay
-        startAutoPlay()
-
-        return () => {
-            // Clear autoplay on unmount
-            if (autoPlayRef.current) {
-                clearInterval(autoPlayRef.current)
-            }
-        }
-    }, [slides.length])
-
-    const startAutoPlay = () => {
-        if (autoPlayRef.current) {
-            clearInterval(autoPlayRef.current)
-        }
-
-        autoPlayRef.current = setInterval(() => {
-            setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
-        }, 5000)
-    }
-
-    // const goToSlide = (index: number) => {
-    //     setCurrentSlide(index)
-    //     startAutoPlay()
-    // }
+        const cleanup = startAutoPlay()
+        return () => cleanup()
+    }, [slides.length, startAutoPlay])
 
     const goToPrevSlide = () => {
         setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))
-        startAutoPlay()
     }
 
     const goToNextSlide = () => {
         setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
-        startAutoPlay()
     }
 
     // Touch handlers for mobile swipe
@@ -164,20 +152,6 @@ export function HeroSlider() {
             >
                 <ChevronRight size={20} />
             </button>
-
-            {/* Dots navigation */}
-            {/* <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                {slides.map((_, index) => (
-                    <button
-                        key={index}
-                        className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${index === currentSlide ? "bg-white scale-125" : "bg-white/50"
-                            }`}
-                        onClick={() => goToSlide(index)}
-                        aria-label={`Go to slide ${index + 1}`}
-                        aria-current={index === currentSlide}
-                    />
-                ))}
-            </div> */}
         </div>
     )
 }
