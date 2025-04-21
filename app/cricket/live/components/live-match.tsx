@@ -1500,7 +1500,7 @@ export default function LiveMatch() {
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[1].status === "SUSPENDED" && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                          <div className="absolute inset-0 flex items-center justify-center z-10">
                             <span className="text-red-500 font-bold text-lg">
                               SUSPENDED
                             </span>
