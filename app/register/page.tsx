@@ -1,50 +1,47 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [mobile, setMobile] = useState("")
-  const [otp, setOtp] = useState("")
-  const [tempToken, setTempToken] = useState("")
-  const [isOtpSent, setIsOtpSent] = useState(false)
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [countdown, setCountdown] = useState(0)
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
+  const [tempToken, setTempToken] = useState("");
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   const startCountdown = () => {
-    setCountdown(60)
+    setCountdown(60);
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(timer)
-          return 0
+          clearInterval(timer);
+          return 0;
         }
-        return prev - 1
-      })
-    }, 1000)
-  }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      let formattedPhone = mobile
+      let formattedPhone = mobile;
       if (!formattedPhone.startsWith("+")) {
-        formattedPhone = "+" + formattedPhone
+        formattedPhone = "+" + formattedPhone;
       }
       if (!formattedPhone.startsWith("+91")) {
-        formattedPhone = "+91" + formattedPhone.substring(1)
+        formattedPhone = "+91" + formattedPhone.substring(1);
       }
 
       const response = await fetch("https://book2500.funzip.in/api/register", {
@@ -59,84 +56,107 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success === true) {
-        router.push(`/verify-otp?phone=${encodeURIComponent(formattedPhone)}&token=${encodeURIComponent(data.temp_token)}&isSignup=true`)
+        router.push(
+          `/verify-otp?phone=${encodeURIComponent(
+            formattedPhone
+          )}&token=${encodeURIComponent(data.temp_token)}&isSignup=true`
+        );
       } else {
-        setError(data.message || "Registration failed. Please try again.")
+        if (data.errors) {
+          Object.entries(data.errors).forEach(([field, messages]) => {
+            const message = Array.isArray(messages) ? messages[0] : messages;
+            toast.error(`${field}: ${message}`);
+          });
+        } else {
+          toast.error(data.message || "Registration failed");
+        }
       }
     } catch (error) {
-      console.error("Registration error:", error)
-      setError("Registration failed. Please check your details.")
+      console.error("Registration error:", error);
+      toast.error("Unable to process registration");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      const response = await fetch("https://book2500.funzip.in/api/verify-register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ temp_token: tempToken, otp }),
-      });
+      const response = await fetch(
+        "https://book2500.funzip.in/api/verify-register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ temp_token: tempToken, otp }),
+        }
+      );
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success === true) {
-        router.push("/login")
+        toast.success("Registration successful");
+        router.push("/login");
       } else {
-        setError(data.message || "Invalid OTP. Please try again.")
+        if (data.errors) {
+          Object.entries(data.errors).forEach(([field, messages]) => {
+            const message = Array.isArray(messages) ? messages[0] : messages;
+            toast.error(`${field}: ${message}`);
+          });
+        } else {
+          toast.error(data.message || "Invalid OTP");
+        }
       }
     } catch (error) {
-      console.error("OTP verification error:", error)
-      setError("OTP verification failed. Please try again.")
+      console.error("OTP verification error:", error);
+      toast.error("Failed to verify OTP");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleResendOtp = async () => {
-    if (countdown > 0) return
-    setError("")
+    if (countdown > 0) return;
 
     try {
-      let formattedPhone = mobile
+      let formattedPhone = mobile;
       if (!formattedPhone.startsWith("+")) {
-        formattedPhone = "+" + formattedPhone
+        formattedPhone = "+" + formattedPhone;
       }
       if (!formattedPhone.startsWith("+91")) {
-        formattedPhone = "+91" + formattedPhone.substring(1)
+        formattedPhone = "+91" + formattedPhone.substring(1);
       }
 
-      const response = await fetch("https://book2500.funzip.in/api/resend-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone: formattedPhone }),
-      });
+      const response = await fetch(
+        "https://book2500.funzip.in/api/resend-otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ phone: formattedPhone }),
+        }
+      );
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success === true) {
-        setTempToken(data.temp_token)
-        startCountdown()
+        setTempToken(data.temp_token);
+        startCountdown();
       } else {
-        setError(data.message || "Failed to resend OTP. Please try again.")
+        toast.error(data.message || "Failed to resend OTP. Please try again.");
       }
     } catch (error) {
-      console.error("Resend OTP error:", error)
-      setError("Failed to resend OTP. Please try again.")
+      console.error("Resend OTP error:", error);
+      toast.error("Failed to resend OTP. Please try again.");
     }
-  }
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-136px)]">
@@ -144,13 +164,18 @@ export default function RegisterPage() {
         <div className="w-full bg-brand-darkPurple rounded-lg shadow-xl p-8 border-2 border-amber-500">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white">Create Account</h1>
-            <p className="text-gray-400 mt-2">Join Book2500 and start betting!</p>
+            <p className="text-gray-400 mt-2">
+              Join Book2500 and start betting!
+            </p>
           </div>
 
           {!isOtpSent ? (
             <form onSubmit={handleRegister} className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-200">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-gray-200"
+                >
                   Full Name
                 </label>
                 <Input
@@ -165,7 +190,10 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-200">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-200"
+                >
                   Email Address
                 </label>
                 <Input
@@ -180,7 +208,10 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="mobile" className="block text-sm font-medium text-gray-200">
+                <label
+                  htmlFor="mobile"
+                  className="block text-sm font-medium text-gray-200"
+                >
                   Mobile Number
                 </label>
                 <Input
@@ -195,9 +226,11 @@ export default function RegisterPage() {
                 <p className="text-xs text-gray-400">Format: +91XXXXXXXXXX</p>
               </div>
 
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              <Button type="submit" className="w-full bg-green-800 cursor-pointer font-bold py-3" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-green-800 cursor-pointer font-bold py-3"
+                disabled={loading}
+              >
                 {loading ? "Registering..." : "SIGN UP"}
               </Button>
 
@@ -211,7 +244,10 @@ export default function RegisterPage() {
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="otp" className="block text-sm font-medium text-gray-200">
+                <label
+                  htmlFor="otp"
+                  className="block text-sm font-medium text-gray-200"
+                >
                   Enter OTP sent to your mobile
                 </label>
                 <Input
@@ -225,23 +261,33 @@ export default function RegisterPage() {
                 />
               </div>
 
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-
-              <Button type="submit" className="w-full bg-brand-red hover:bg-red-700 font-bold py-3" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-brand-red hover:bg-red-700 font-bold py-3"
+                disabled={loading}
+              >
                 {loading ? "Verifying..." : "VERIFY OTP"}
               </Button>
 
               <div className="flex justify-between items-center text-sm">
                 <button
                   type="button"
-                  className={`text-brand-gold ${countdown > 0 ? "opacity-50 cursor-not-allowed" : "hover:underline"}`}
+                  className={`text-brand-gold ${
+                    countdown > 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:underline"
+                  }`}
                   onClick={handleResendOtp}
                   disabled={countdown > 0}
                 >
                   {countdown > 0 ? `Resend OTP in ${countdown}s` : "Resend OTP"}
                 </button>
 
-                <button type="button" className="text-brand-gold hover:underline" onClick={() => setIsOtpSent(false)}>
+                <button
+                  type="button"
+                  className="text-brand-gold hover:underline"
+                  onClick={() => setIsOtpSent(false)}
+                >
                   Change Details
                 </button>
               </div>
@@ -250,6 +296,5 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

@@ -1582,7 +1582,6 @@ export default function LiveMatch() {
                   <h2 className="text-white font-bold">FANCY</h2>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {/* <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">CASHOUT</div> */}
                   <div className="text-white text-xs hidden sm:block">
                     Min: 100 | Max: 250K
                   </div>
@@ -1604,59 +1603,68 @@ export default function LiveMatch() {
                   </div>
 
                   <div className="space-y-2">
-                    {fancyOddsMappings.map((odd, idx) => {
-                      const isSuspended = !odd.back?.price || !odd.lay?.price;
+                    {/* Sort fancyOddsMappings based on SelectionId */}
+                    {fancyOddsMappings
+                      .sort((a, b) => {
+                        const selectionIdA =
+                          a.back?.SelectionId || a.lay?.SelectionId || "";
+                        const selectionIdB =
+                          b.back?.SelectionId || b.lay?.SelectionId || "";
+                        return selectionIdA.localeCompare(selectionIdB);
+                      })
+                      .map((odd, idx) => {
+                        const isSuspended = !odd.back?.price || !odd.lay?.price;
 
-                      return (
-                        <div
-                          key={`${odd.Question_id}-${idx}`}
-                          className="border-b border-purple-900 last:border-b-0"
-                        >
-                          <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                            {odd.RunnerName}
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 p-2 relative">
-                            {isSuspended && (
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                                <span className="text-red-500 font-bold text-lg">
-                                  SUSPENDED
+                        return (
+                          <div
+                            key={`${odd.Question_id}-${idx}`}
+                            className="border-b border-purple-900 last:border-b-0"
+                          >
+                            <div className="text-white font-bold pl-4 py-2 ">
+                              {odd.RunnerName}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 p-2 relative">
+                              {isSuspended && (
+                                <div className="absolute inset-0  flex items-center justify-center z-10">
+                                  <span className="text-red-500 font-bold text-lg">
+                                    SUSPENDED
+                                  </span>
+                                </div>
+                              )}
+                              {/* NO button */}
+                              <button
+                                onClick={() =>
+                                  !isSuspended && handleFancyBet(odd, "no")
+                                }
+                                disabled={isSuspended}
+                                className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] cursor-pointer disabled:opacity-50"
+                              >
+                                <span className="text-white font-bold text-lg">
+                                  {odd.back?.price?.toFixed(0) || "0"}
                                 </span>
-                              </div>
-                            )}
-                            {/* NO button */}
-                            <button
-                              onClick={() =>
-                                !isSuspended && handleFancyBet(odd, "no")
-                              }
-                              disabled={isSuspended}
-                              className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] cursor-pointer disabled:opacity-50"
-                            >
-                              <span className="text-white font-bold text-lg">
-                                {odd.back?.price?.toFixed(0) || "0"}
-                              </span>
-                              <span className="text-xs text-gray-200">
-                                {odd.back?.size?.toLocaleString() || "0"}
-                              </span>
-                            </button>
-                            {/* YES button */}
-                            <button
-                              onClick={() =>
-                                !isSuspended && handleFancyBet(odd, "yes")
-                              }
-                              disabled={isSuspended}
-                              className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] cursor-pointer disabled:opacity-50"
-                            >
-                              <span className="text-white font-bold text-lg">
-                                {odd.lay?.price?.toFixed(0) || "0"}
-                              </span>
-                              <span className="text-xs text-gray-200">
-                                {odd.lay?.size?.toLocaleString() || "0"}
-                              </span>
-                            </button>
+                                <span className="text-xs text-gray-200">
+                                  {odd.back?.size?.toLocaleString() || "0"}
+                                </span>
+                              </button>
+                              {/* YES button */}
+                              <button
+                                onClick={() =>
+                                  !isSuspended && handleFancyBet(odd, "yes")
+                                }
+                                disabled={isSuspended}
+                                className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] cursor-pointer disabled:opacity-50"
+                              >
+                                <span className="text-white font-bold text-lg">
+                                  {odd.lay?.price?.toFixed(0) || "0"}
+                                </span>
+                                <span className="text-xs text-gray-200">
+                                  {odd.lay?.size?.toLocaleString() || "0"}
+                                </span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -1812,12 +1820,12 @@ export default function LiveMatch() {
                       Place Bet
                     </Button>
                   </div>
-                  <button
+                  {/* <button
                     onClick={(e) => handleCashoutClick(e, "match-odds")}
                     className="w-full bg-yellow-500 text-black mt-4 py-2 rounded"
                   >
                     Cashout Match
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
