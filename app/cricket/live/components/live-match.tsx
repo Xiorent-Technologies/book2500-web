@@ -766,10 +766,10 @@ export default function LiveMatch() {
       );
       const data = await response.json();
 
-      // if (data?.data) {
-      setBookmakerMarket(data.data);
-      console.log(data.data);
-      // }
+      if (data?.data) {
+        setBookmakerMarket(data.data);
+        // console.log(data.data);
+      }
     } catch (error) {
       console.error("Error fetching bookmaker odds:", error);
     }
