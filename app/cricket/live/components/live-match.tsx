@@ -74,6 +74,9 @@ interface BookmakerRunner extends BetItem {
   totalMatched: number;
   batb: Array<[number, number]>;
   batl: Array<[number, number]>;
+  Option_id?: number;
+  Question_id?: number;
+  Match_id?: number;
 }
 
 interface FancyOdds extends BetItem {
@@ -565,57 +568,67 @@ export default function LiveMatch() {
 
         const data = await response.json();
 
-        // if (data.success && data.data) {
-        // Group odds by RunnerName
-        const groupedOdds = data.data.reduce(
-          (acc: { [key: string]: GroupedFancyOdd }, curr: FancyApiMapping) => {
-            const key = `${curr.Question_id}-${curr.RunnerName}`;
+        // Add null check and default to empty array if data.data is undefined
+        if (data && Array.isArray(data.data)) {
+          // Group odds by RunnerName
+          const groupedOdds = data.data.reduce(
+            (
+              acc: { [key: string]: GroupedFancyOdd },
+              curr: FancyApiMapping
+            ) => {
+              const key = `${curr.Question_id}-${curr.RunnerName}`;
 
-            if (!acc[key]) {
-              acc[key] = {
-                RunnerName: curr.RunnerName,
-                Match_id: curr.Match_id,
-                Question_id: curr.Question_id,
-                back: null,
-                lay: null,
-              };
-            }
+              if (!acc[key]) {
+                acc[key] = {
+                  RunnerName: curr.RunnerName,
+                  Match_id: curr.Match_id,
+                  Question_id: curr.Question_id,
+                  back: null,
+                  lay: null,
+                };
+              }
 
-            if (curr.Option_name.toLowerCase() === "back") {
-              acc[key].back = {
-                Option_id: curr.Option_id,
-                Option_name: curr.Option_name,
-                SelectionId: curr.SelectionId,
-                min: curr.min,
-                max: curr.max,
-                price: 0,
-                size: 0,
-              };
-            } else if (curr.Option_name.toLowerCase() === "lay") {
-              acc[key].lay = {
-                Option_id: curr.Option_id,
-                Option_name: curr.Option_name,
-                SelectionId: curr.SelectionId,
-                min: curr.min,
-                max: curr.max,
-                price: 0,
-                size: 0,
-              };
-            }
+              if (curr.Option_name.toLowerCase() === "back") {
+                acc[key].back = {
+                  Option_id: curr.Option_id,
+                  Option_name: curr.Option_name,
+                  SelectionId: curr.SelectionId,
+                  min: curr.min,
+                  max: curr.max,
+                  price: 0,
+                  size: 0,
+                };
+              } else if (curr.Option_name.toLowerCase() === "lay") {
+                acc[key].lay = {
+                  Option_id: curr.Option_id,
+                  Option_name: curr.Option_name,
+                  SelectionId: curr.SelectionId,
+                  min: curr.min,
+                  max: curr.max,
+                  price: 0,
+                  size: 0,
+                };
+              }
 
-            return acc;
-          },
-          {}
-        );
+              return acc;
+            },
+            {}
+          );
 
-        setFancyOddsMappings(Object.values(groupedOdds));
-        // }
+          setFancyOddsMappings(Object.values(groupedOdds));
+        } else {
+          console.warn("No fancy odds data available or invalid format");
+          setFancyOddsMappings([]);
+        }
       } catch (error) {
         console.error("Error fetching fancy odds:", error);
+        setFancyOddsMappings([]);
       }
     };
 
     fetchInitialFancyOdds();
+    const interval = setInterval(fetchInitialFancyOdds, 1500);
+    return () => clearInterval(interval);
   }, [eventId, marketId]);
 
   const updateFancyOdds = async () => {
@@ -667,7 +680,7 @@ export default function LiveMatch() {
   };
 
   useEffect(() => {
-    const interval = setInterval(updateFancyOdds, 1000);
+    const interval = setInterval(updateFancyOdds, 1500);
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
@@ -701,55 +714,62 @@ export default function LiveMatch() {
     fetchInitialBookmakerOdds();
   }, [eventId, marketId]);
 
-  // Update fetchBookmakerOdds function
   const fetchBookmakerOdds = useCallback(async () => {
     if (!eventId || !marketId) return;
 
     try {
-      const response = await fetch(
-        `https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`
+      // Get initial mappings
+      const mappingResponse = await fetch(
+        "https://book2500.funzip.in/api/bookmaker-odds",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, market_id: marketId }),
+        }
       );
-      const data = await response.json();
+      const mappingData = await mappingResponse.json();
 
-      if (data?.data) {
-        // Map the bookmaker data correctly
+      // Get real-time odds
+      const oddsResponse = await fetch(
+        `https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`
+      );
+      const oddsData = await oddsResponse.json();
+
+      if (oddsData?.data && mappingData?.data) {
+        // Create a mapping of SelectionId to Option details
+        const selectionMap = mappingData.data.reduce((acc, item) => {
+          acc[item.SelectionId] = item;
+          return acc;
+        }, {});
+
+        // Format the bookmaker data combining both APIs
         const formattedBookmaker = {
-          ...data.data,
-          runners: data.data.runners.map((runner: any) => ({
-            ...runner,
-            runnerName: runner.runner || runner.runnerName || "Unknown", // Add fallback for runner name
-            ex: {
-              availableToBack: [
-                {
-                  price: parseFloat(runner.BackPrice1) || 0,
-                  size: parseFloat(runner.BackSize1) || 0,
-                },
-                {
-                  price: parseFloat(runner.BackPrice2) || 0,
-                  size: parseFloat(runner.BackSize2) || 0,
-                },
-                {
-                  price: parseFloat(runner.BackPrice3) || 0,
-                  size: parseFloat(runner.BackSize3) || 0,
-                },
-              ],
-              availableToLay: [
-                {
-                  price: parseFloat(runner.LayPrice1) || 0,
-                  size: parseFloat(runner.LaySize1) || 0,
-                },
-                {
-                  price: parseFloat(runner.LayPrice2) || 0,
-                  size: parseFloat(runner.LaySize2) || 0,
-                },
-                {
-                  price: parseFloat(runner.LayPrice3) || 0,
-                  size: parseFloat(runner.LaySize3) || 0,
-                },
-              ],
-            },
-            status: runner.GameStatus || runner.status || "ACTIVE",
-          })),
+          marketId: oddsData.data.marketId,
+          min: oddsData.data.min,
+          max: oddsData.data.max,
+          mname: oddsData.data.mname,
+          status: oddsData.data.status,
+          runners: oddsData.data.runners.map((runner) => {
+            const mappingInfo = selectionMap[runner.selectionId];
+            return {
+              selectionId: runner.selectionId,
+              runnerName: runner.runnerName,
+              status: runner.status,
+              Option_id: mappingInfo?.Option_id,
+              Question_id: mappingInfo?.Question_id,
+              Match_id: mappingInfo?.Match_id,
+              ex: {
+                availableToBack: runner.back.map((b) => ({
+                  price: parseFloat(b.price1) || 0,
+                  size: parseFloat(b.size) || 0,
+                })),
+                availableToLay: runner.lay.map((l) => ({
+                  price: parseFloat(l.price1) || 0,
+                  size: parseFloat(l.size) || 0,
+                })),
+              },
+            };
+          }),
         };
         setBookmakerMarket(formattedBookmaker);
       }
@@ -1004,7 +1024,8 @@ export default function LiveMatch() {
       match_id: parseInt(odd.Match_id, 10),
     });
 
-    setSelectedOdds(option.price.toFixed(2));
+    // Hardcode ratio to 2 for fancy bets
+    setSelectedOdds("2.00");
     setSelectedStake(MIN_STAKE.toString());
 
     if (isMobile) {
@@ -1023,21 +1044,16 @@ export default function LiveMatch() {
         ? runner.ex?.availableToBack?.[0]?.price
         : runner.ex?.availableToLay?.[0]?.price;
 
-    if (!odds) return;
-
-    const bookmakerData = matchApiData.find(
-      (data) => data.Option_name === runner.runnerName
-    );
-
-    if (!bookmakerData) return;
+    if (!odds || !runner.Option_id || !runner.Question_id || !runner.Match_id)
+      return;
 
     setSelectedBet({
       name: runner.runnerName,
       type: type.toUpperCase(),
       section: "BOOKMAKER",
-      betoption_id: bookmakerData.Option_id,
-      betquestion_id: bookmakerData.Question_id,
-      match_id: parseInt(bookmakerData.Match_id, 10),
+      betoption_id: runner.Option_id,
+      betquestion_id: runner.Question_id,
+      match_id: runner.Match_id,
     });
 
     setSelectedOdds(odds.toFixed(2));
