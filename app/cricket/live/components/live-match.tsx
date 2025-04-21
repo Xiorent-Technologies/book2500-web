@@ -1227,6 +1227,7 @@ export default function LiveMatch() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 pb-20 lg:pb-0">
+            {/* MATCH ODDS */}
             <div className="mb-4">
               <div
                 className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
@@ -1362,6 +1363,7 @@ export default function LiveMatch() {
               )}
             </div>
 
+            {/* BOOKMAKER ODDS */}
             <div className="mb-4">
               <div
                 className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
@@ -1391,7 +1393,7 @@ export default function LiveMatch() {
               </div>
 
               {expandedSections.bookmaker && (
-                <div className="p-0">
+                <div className="p-0 overflow-hidden">
                   <div className="grid grid-cols-2 w-full">
                     <div className="text-center py-2 bg-[#3a2255] text-white font-bold border-b border-purple-800">
                       BACK
@@ -1400,19 +1402,17 @@ export default function LiveMatch() {
                       LAY
                     </div>
                   </div>
-                  {/* Bookmaker odds */}
-                  {bookmakerMarket?.runners?.map((runner, idx) => (
-                    <div key={idx} className="border-b border-purple-900">
+                  {/* First team */}
+                  {bookmakerMarket?.runners?.[0] && (
+                    <div
+                      key={bookmakerMarket.runners[0].selectionId}
+                      className="border-b border-purple-900"
+                    >
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                        {runner.runnerName}
-                        {/* {runner.status !== "ACTIVE" && (
-                          <span className="text-red-500 ml-2">
-                            ({runner.status})
-                          </span>
-                        )} */}
+                        {bookmakerMarket.runners[0].runnerName}
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
-                        {runner.status === "SUSPENDED" && (
+                        {bookmakerMarket.runners[0].status === "SUSPENDED" && (
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                             <span className="text-red-500 font-bold text-lg">
                               SUSPENDED
@@ -1424,17 +1424,22 @@ export default function LiveMatch() {
                           <div
                             key={`back-${i}`}
                             onClick={() =>
-                              runner.status === "ACTIVE" &&
-                              handleBookmakerBet(runner, "back")
+                              bookmakerMarket.runners[0].status === "ACTIVE" &&
+                              handleBookmakerBet(
+                                bookmakerMarket.runners[0],
+                                "back"
+                              )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
                           >
                             <div className="text-white font-bold">
-                              {runner.back[i]?.price?.toFixed(1) || "0.0"}
+                              {bookmakerMarket.runners[0].back[
+                                i
+                              ]?.price?.toFixed(1) || "0.0"}
                             </div>
                             <div className="text-xs text-gray-200">
                               {Number(
-                                runner.back[i]?.size || 0
+                                bookmakerMarket.runners[0].back[i]?.size || 0
                               ).toLocaleString()}
                             </div>
                           </div>
@@ -1444,28 +1449,127 @@ export default function LiveMatch() {
                           <div
                             key={`lay-${i}`}
                             onClick={() =>
-                              runner.status === "ACTIVE" &&
-                              handleBookmakerBet(runner, "lay")
+                              bookmakerMarket.runners[0].status === "ACTIVE" &&
+                              handleBookmakerBet(
+                                bookmakerMarket.runners[0],
+                                "lay"
+                              )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
                           >
                             <div className="text-white font-bold">
-                              {runner.lay[i]?.price?.toFixed(1) || "0.0"}
+                              {bookmakerMarket.runners[0].lay[
+                                i
+                              ]?.price?.toFixed(1) || "0.0"}
                             </div>
                             <div className="text-xs text-gray-200">
                               {Number(
-                                runner.lay[i]?.size || 0
+                                bookmakerMarket.runners[0].lay[i]?.size || 0
                               ).toLocaleString()}
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Marquee between teams */}
+                  {bookmakerMarket?.rem && (
+                    <div className="p-2 border-b border-purple-900">
+                      <div className="whitespace-nowrap animate-marquee">
+                        <span className="text-red-500 font-medium">
+                          {bookmakerMarket.rem}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Second team */}
+                  {bookmakerMarket?.runners?.[1] && (
+                    <div
+                      key={bookmakerMarket.runners[1].selectionId}
+                      className="border-b border-purple-900"
+                    >
+                      <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
+                        {bookmakerMarket.runners[1].runnerName}
+                      </div>
+                      <div className="grid grid-cols-6 w-full relative">
+                        {bookmakerMarket.runners[1].status === "SUSPENDED" && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                            <span className="text-red-500 font-bold text-lg">
+                              SUSPENDED
+                            </span>
+                          </div>
+                        )}
+                        {/* Back prices */}
+                        {[2, 1, 0].map((i) => (
+                          <div
+                            key={`back-${i}`}
+                            onClick={() =>
+                              bookmakerMarket.runners[1].status === "ACTIVE" &&
+                              handleBookmakerBet(
+                                bookmakerMarket.runners[1],
+                                "back"
+                              )
+                            }
+                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
+                          >
+                            <div className="text-white font-bold">
+                              {bookmakerMarket.runners[1].back[
+                                i
+                              ]?.price?.toFixed(1) || "0.0"}
+                            </div>
+                            <div className="text-xs text-gray-200">
+                              {Number(
+                                bookmakerMarket.runners[1].back[i]?.size || 0
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                        {/* Lay prices */}
+                        {[0, 1, 2].map((i) => (
+                          <div
+                            key={`lay-${i}`}
+                            onClick={() =>
+                              bookmakerMarket.runners[1].status === "ACTIVE" &&
+                              handleBookmakerBet(
+                                bookmakerMarket.runners[1],
+                                "lay"
+                              )
+                            }
+                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
+                          >
+                            <div className="text-white font-bold">
+                              {bookmakerMarket.runners[1].lay[
+                                i
+                              ]?.price?.toFixed(1) || "0.0"}
+                            </div>
+                            <div className="text-xs text-gray-200">
+                              {Number(
+                                bookmakerMarket.runners[1].lay[i]?.size || 0
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Marquee between teams */}
+                  {bookmakerMarket?.rem && (
+                    <div className="p-2 border-b border-purple-900">
+                      <div className="whitespace-nowrap animate-marquee">
+                        <span className="text-red-500 font-medium">
+                          {bookmakerMarket.rem}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
+            {/* FANCY ODDS */}
             <div className="mb-4">
               <div
                 className="flex items-center justify-between bg-[#231439] p-3 cursor-pointer"
