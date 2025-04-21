@@ -862,6 +862,11 @@ export default function LiveMatch() {
         betoption_id: selectedBet.betoption_id,
         betquestion_id: selectedBet.betquestion_id,
         match_id: selectedBet.match_id,
+        isback:
+          selectedBet.type.toLowerCase() === "back" ||
+          selectedBet.type.toLowerCase() === "no"
+            ? 1
+            : 0,
       };
 
       console.log("Sending bet request:", requestBody);
@@ -1089,7 +1094,7 @@ export default function LiveMatch() {
       potentialReturn,
       selectedTeam: selectedBet?.name || "",
       otherTeam,
-      isBack: selectedBet?.type === "BACK",
+      isback: selectedBet?.type === "BACK",
     };
   }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
@@ -1207,7 +1212,7 @@ export default function LiveMatch() {
               )}
             </div>
 
-            <div className="w-full h-[55px] bg-black rounded-lg overflow-hidden">
+            <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
               {liveMatchData?.iframeScore && (
                 <iframe
                   src={liveMatchData.iframeScore}
@@ -1720,12 +1725,12 @@ export default function LiveMatch() {
                           </span>
                           <span
                             className={`font-medium ${
-                              calculateReturns()?.isBack
+                              calculateReturns()?.isback
                                 ? "text-green-400"
                                 : "text-red-400"
                             }`}
                           >
-                            {calculateReturns()?.isBack ? "+" : "-"}₹
+                            {calculateReturns()?.isback ? "+" : "-"}₹
                             {Math.abs(calculateReturns()?.profit || 0).toFixed(
                               0
                             )}
@@ -1738,12 +1743,12 @@ export default function LiveMatch() {
                           </span>
                           <span
                             className={`font-medium ${
-                              calculateReturns()?.isBack
+                              calculateReturns()?.isback
                                 ? "text-red-400"
                                 : "text-green-400"
                             }`}
                           >
-                            {calculateReturns()?.isBack ? "-" : "+"}₹
+                            {calculateReturns()?.isback ? "-" : "+"}₹
                             {Math.abs(calculateReturns()?.stake || 0).toFixed(
                               0
                             )}
@@ -1898,12 +1903,12 @@ export default function LiveMatch() {
                         </span>
                         <span
                           className={`font-medium ${
-                            calculateReturns()?.isBack
+                            calculateReturns()?.isback
                               ? "text-green-400"
                               : "text-red-400"
                           }`}
                         >
-                          {calculateReturns()?.isBack ? "+" : "-"}₹
+                          {calculateReturns()?.isback ? "+" : "-"}₹
                           {Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
                         </span>
                       </div>
@@ -1914,12 +1919,12 @@ export default function LiveMatch() {
                         </span>
                         <span
                           className={`font-medium ${
-                            calculateReturns()?.isBack
+                            calculateReturns()?.isback
                               ? "text-red-400"
                               : "text-green-400"
                           }`}
                         >
-                          {calculateReturns()?.isBack ? "-" : "+"}₹
+                          {calculateReturns()?.isback ? "-" : "+"}₹
                           {Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
                         </span>
                       </div>

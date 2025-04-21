@@ -68,6 +68,7 @@ export interface PredictionData {
     betquestion_id: number;
     match_id: number;
     ratio: string;
+    isback: number;
 }
 
 interface FancyOddsApiResponse {
