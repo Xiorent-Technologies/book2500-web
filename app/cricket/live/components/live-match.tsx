@@ -58,25 +58,57 @@ interface BookmakerMarket {
   marketId: string;
   evid: string;
   inplay: boolean;
-  mname: string;
+  isMarketDataDelayed: boolean;
+  status: string;
+  provider: string;
+  betDelay: number;
+  bspReconciled: boolean;
+  complete: boolean;
+  numberOfWinners: number;
+  numberOfRunners: number;
+  numberOfActiveRunners: number;
+  lastMatchTime: string;
+  totalMatched: number;
+  totalAvailable: number;
+  crossMatching: boolean;
+  runnersVoidable: boolean;
+  version: number;
+  runners: BookmakerRunner[];
   min: string;
   max: string;
+  mname: string;
   rem: string;
-  runners: BookmakerRunner[];
-  status: string;
 }
 
-interface BookmakerRunner extends BetItem {
+interface BookmakerRunner {
   selectionId: number;
   runnerName: string;
+  handicap: number;
   status: string;
   lastPriceTraded: number;
   totalMatched: number;
-  batb: Array<[number, number]>;
-  batl: Array<[number, number]>;
-  Option_id?: number;
-  Question_id?: number;
-  Match_id?: number;
+  back: Array<{
+    price1: number;
+    price: number;
+    size: string;
+  }>;
+  lay: Array<{
+    price1: number;
+    price: number;
+    size: string;
+  }>;
+  ex: {
+    availableToBack: Array<{
+      price: number;
+      size: string;
+      price1: number;
+    }>;
+    availableToLay: Array<{
+      price: number;
+      size: string;
+      price1: number;
+    }>;
+  };
 }
 
 interface FancyOdds extends BetItem {
@@ -277,6 +309,15 @@ interface RealTimeFancyOdd {
   rem: string;
 }
 
+interface BookmakerMapping {
+  RunnerName: string;
+  Match_id: string;
+  Question_id: number;
+  Option_id: number;
+  Option_name: string;
+  SelectionId: string;
+}
+
 function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -352,6 +393,9 @@ export default function LiveMatch() {
   const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
     []
   );
+  const [bookmakerMappings, setBookmakerMappings] = useState<
+    BookmakerMapping[]
+  >([]);
 
   const handleFancyOddsUpdate = useCallback(
     (realtimeOdds: RealTimeFancyOdds[]) => {
@@ -684,108 +728,56 @@ export default function LiveMatch() {
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
-  // Add new effect for bookmaker odds initialization
-  useEffect(() => {
-    const fetchInitialBookmakerOdds = async () => {
-      if (!eventId || !marketId) return;
+  const fetchBookmakerMappings = useCallback(async () => {
+    if (!eventId || !marketId) return;
 
-      try {
-        const response = await fetch(
-          "https://book2500.funzip.in/api/bookmaker-odds",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ event_id: eventId, market_id: marketId }),
-          }
-        );
+    try {
+      const response = await fetch(
+        "https://book2500.funzip.in/api/bookmaker-odds",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_id: eventId,
+            market_id: marketId,
+          }),
+        }
+      );
 
-        const data = await response.json();
-
-        // if (data.success && data.data) {
-        // Store the mapping for later use
-        setBookmakerMarket(data.data);
-        // }
-      } catch (error) {
-        console.error("Error fetching initial bookmaker odds:", error);
-        setError("Failed to load initial bookmaker data");
+      const data = await response.json();
+      if (data?.data) {
+        setBookmakerMappings(data.data);
       }
-    };
-
-    fetchInitialBookmakerOdds();
+    } catch (error) {
+      console.error("Error fetching bookmaker mappings:", error);
+    }
   }, [eventId, marketId]);
+
+  useEffect(() => {
+    fetchBookmakerMappings();
+  }, [fetchBookmakerMappings]);
 
   const fetchBookmakerOdds = useCallback(async () => {
     if (!eventId || !marketId) return;
 
     try {
-      // Get initial mappings
-      const mappingResponse = await fetch(
-        "https://book2500.funzip.in/api/bookmaker-odds",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event_id: eventId, market_id: marketId }),
-        }
-      );
-      const mappingData = await mappingResponse.json();
-
-      // Get real-time odds
-      const oddsResponse = await fetch(
+      const response = await fetch(
         `https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`
       );
-      const oddsData = await oddsResponse.json();
+      const data = await response.json();
 
-      if (oddsData?.data && mappingData?.data) {
-        // Create a mapping of SelectionId to Option details
-        const selectionMap = mappingData.data.reduce((acc, item) => {
-          acc[item.SelectionId] = item;
-          return acc;
-        }, {});
-
-        // Format the bookmaker data combining both APIs
-        const formattedBookmaker = {
-          marketId: oddsData.data.marketId,
-          min: oddsData.data.min,
-          max: oddsData.data.max,
-          mname: oddsData.data.mname,
-          status: oddsData.data.status,
-          runners: oddsData.data.runners.map((runner) => {
-            const mappingInfo = selectionMap[runner.selectionId];
-            return {
-              selectionId: runner.selectionId,
-              runnerName: runner.runnerName,
-              status: runner.status,
-              Option_id: mappingInfo?.Option_id,
-              Question_id: mappingInfo?.Question_id,
-              Match_id: mappingInfo?.Match_id,
-              ex: {
-                availableToBack: runner.back.map((b) => ({
-                  price: parseFloat(b.price1) || 0,
-                  size: parseFloat(b.size) || 0,
-                })),
-                availableToLay: runner.lay.map((l) => ({
-                  price: parseFloat(l.price1) || 0,
-                  size: parseFloat(l.size) || 0,
-                })),
-              },
-            };
-          }),
-        };
-        setBookmakerMarket(formattedBookmaker);
-      }
+      // if (data?.data) {
+      setBookmakerMarket(data.data);
+      console.log(data.data);
+      // }
     } catch (error) {
-      console.error("Error fetching real-time bookmaker odds:", error);
+      console.error("Error fetching bookmaker odds:", error);
     }
   }, [eventId, marketId]);
 
   useEffect(() => {
-    // Initial fetch
     fetchBookmakerOdds();
-
-    // Set up polling interval
     const interval = setInterval(fetchBookmakerOdds, 1000);
-
-    // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [fetchBookmakerOdds]);
 
@@ -1044,16 +1036,27 @@ export default function LiveMatch() {
         ? runner.ex?.availableToBack?.[0]?.price
         : runner.ex?.availableToLay?.[0]?.price;
 
-    if (!odds || !runner.Option_id || !runner.Question_id || !runner.Match_id)
+    if (!odds) return;
+
+    // Find the matching mapping for this runner
+    const mapping = bookmakerMappings.find(
+      (m) => m.SelectionId === runner.selectionId.toString()
+    );
+
+    if (!mapping) {
+      console.error("No mapping found for runner:", runner);
+      toast.error("Unable to place bet: Invalid selection");
       return;
+    }
 
     setSelectedBet({
       name: runner.runnerName,
       type: type.toUpperCase(),
       section: "BOOKMAKER",
-      betoption_id: runner.Option_id,
-      betquestion_id: runner.Question_id,
-      match_id: runner.Match_id,
+      betoption_id: mapping.Option_id,
+      betquestion_id: mapping.Question_id,
+      match_id: Number(mapping.Match_id),
+      selectionId: runner.selectionId,
     });
 
     setSelectedOdds(odds.toFixed(2));
@@ -1397,76 +1400,68 @@ export default function LiveMatch() {
                       LAY
                     </div>
                   </div>
-
-                  {bookmakerMarket?.runners?.map((runner, idx) => {
-                    const isSuspended =
-                      runner.status === "SUSPENDED" ||
-                      !runner.ex?.availableToBack?.[0]?.price ||
-                      !runner.ex?.availableToLay?.[0]?.price ||
-                      runner.ex?.availableToBack?.[0]?.price === 0 ||
-                      runner.ex?.availableToLay?.[0]?.price === 0;
-
-                    return (
-                      <div key={idx} className="border-b border-purple-900">
-                        <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                          {runner.runnerName}
-                        </div>
-                        <div className="grid grid-cols-6 w-full relative">
-                          {isSuspended && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                              <span className="text-red-500 font-bold text-lg">
-                                SUSPENDED
-                              </span>
-                            </div>
-                          )}
-                          {/* Back prices */}
-                          {[2, 1, 0].map((i) => (
-                            <div
-                              key={`back-${i}`}
-                              onClick={() =>
-                                !isSuspended &&
-                                handleBookmakerBet(runner, "back")
-                              }
-                              className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
-                            >
-                              <div className="text-white font-bold">
-                                {runner.ex?.availableToBack?.[
-                                  i
-                                ]?.price?.toFixed(2) || "0.0"}
-                              </div>
-                              <div className="text-xs text-gray-200">
-                                {runner.ex?.availableToBack?.[
-                                  i
-                                ]?.size?.toLocaleString() || "0"}
-                              </div>
-                            </div>
-                          ))}
-                          {/* Lay prices */}
-                          {[0, 1, 2].map((i) => (
-                            <div
-                              key={`lay-${i}`}
-                              onClick={() =>
-                                !isSuspended &&
-                                handleBookmakerBet(runner, "lay")
-                              }
-                              className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
-                            >
-                              <div className="text-white font-bold">
-                                {runner.ex?.availableToLay?.[i]?.price?.toFixed(
-                                  2
-                                ) || "0.0"}
-                              </div>
-                              <div className="text-xs text-gray-200">
-                                {runner.ex?.availableToLay?.[
-                                  i
-                                ]?.size?.toLocaleString() || "0"}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  {/* Bookmaker odds */}
+                  {bookmakerMarket?.runners?.map((runner, idx) => (
+                    <div key={idx} className="border-b border-purple-900">
+                      <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
+                        {runner.runnerName}
+                        {/* {runner.status !== "ACTIVE" && (
+                          <span className="text-red-500 ml-2">
+                            ({runner.status})
+                          </span>
+                        )} */}
                       </div>
-                    );
-                  })}
+                      <div className="grid grid-cols-6 w-full relative">
+                        {runner.status === "SUSPENDED" && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                            <span className="text-red-500 font-bold text-lg">
+                              SUSPENDED
+                            </span>
+                          </div>
+                        )}
+                        {/* Back prices */}
+                        {[2, 1, 0].map((i) => (
+                          <div
+                            key={`back-${i}`}
+                            onClick={() =>
+                              runner.status === "ACTIVE" &&
+                              handleBookmakerBet(runner, "back")
+                            }
+                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
+                          >
+                            <div className="text-white font-bold">
+                              {runner.back[i]?.price?.toFixed(1) || "0.0"}
+                            </div>
+                            <div className="text-xs text-gray-200">
+                              {Number(
+                                runner.back[i]?.size || 0
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                        {/* Lay prices */}
+                        {[0, 1, 2].map((i) => (
+                          <div
+                            key={`lay-${i}`}
+                            onClick={() =>
+                              runner.status === "ACTIVE" &&
+                              handleBookmakerBet(runner, "lay")
+                            }
+                            className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
+                          >
+                            <div className="text-white font-bold">
+                              {runner.lay[i]?.price?.toFixed(1) || "0.0"}
+                            </div>
+                            <div className="text-xs text-gray-200">
+                              {Number(
+                                runner.lay[i]?.size || 0
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1533,7 +1528,7 @@ export default function LiveMatch() {
                               className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] cursor-pointer disabled:opacity-50"
                             >
                               <span className="text-white font-bold text-lg">
-                                {odd.back?.price?.toFixed(2) || "0.00"}
+                                {odd.back?.price?.toFixed(0) || "0"}
                               </span>
                               <span className="text-xs text-gray-200">
                                 {odd.back?.size?.toLocaleString() || "0"}
@@ -1548,7 +1543,7 @@ export default function LiveMatch() {
                               className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] cursor-pointer disabled:opacity-50"
                             >
                               <span className="text-white font-bold text-lg">
-                                {odd.lay?.price?.toFixed(2) || "0.00"}
+                                {odd.lay?.price?.toFixed(0) || "0"}
                               </span>
                               <span className="text-xs text-gray-200">
                                 {odd.lay?.size?.toLocaleString() || "0"}
