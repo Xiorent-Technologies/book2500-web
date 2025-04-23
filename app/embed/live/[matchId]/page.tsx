@@ -60,7 +60,7 @@ export default async function LiveMatchEmbed({
       </div>
 
       {/* Score Container */}
-      <div className="h-[155px]">
+      <div className="h-[124px]">
         {matchData.iframeScore && (
           <iframe
             src={matchData.iframeScore}

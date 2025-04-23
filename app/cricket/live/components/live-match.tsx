@@ -36,7 +36,7 @@ const isBrowser = typeof window !== "undefined";
 interface Runner {
   Option_id: number;
   Question_id: number;
-  selectionId: number | string;
+  selectionId: string; // Changed from number | string to just string
   runner: string;
   ex?: {
     availableToBack?: Array<{ price: number; size: number }>;
@@ -48,10 +48,11 @@ interface SelectedBet {
   name: string;
   type: string;
   section: string;
-  selectionId?: string | number;
+  selectionId?: string; // Changed from string | number to just string
   betoption_id: number;
   betquestion_id: number;
   match_id: number;
+  level?: number; // Add level for bookmaker bets
 }
 
 interface BookmakerMarket {
@@ -81,7 +82,7 @@ interface BookmakerMarket {
 }
 
 interface BookmakerRunner {
-  selectionId: number;
+  selectionId: string; // Changed from number to string
   runnerName: string;
   handicap: number;
   status: string;
@@ -316,6 +317,12 @@ interface BookmakerMapping {
   Option_id: number;
   Option_name: string;
   SelectionId: string;
+}
+
+interface CashoutData {
+  bet_invest_id: string;
+  base0: string; // on which we are betting ratio
+  base1: string; // opposite of placed bet ratio
 }
 
 function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
@@ -746,7 +753,13 @@ export default function LiveMatch() {
 
       const data = await response.json();
       if (data?.data) {
-        setBookmakerMappings(data.data);
+        // Update the interface mapping to match the API response structure
+        setBookmakerMappings(
+          data.data.map((item: any) => ({
+            ...item,
+            SelectionId: item.SelectionId.toString(), // Ensure SelectionId is string
+          }))
+        );
       }
     } catch (error) {
       console.error("Error fetching bookmaker mappings:", error);
@@ -812,7 +825,12 @@ export default function LiveMatch() {
     toast.loading("Processing your bet...");
 
     try {
-      if (!selectedBet || !selectedOdds || !selectedStake) {
+      if (
+        !selectedBet ||
+        !selectedOdds ||
+        !selectedStake ||
+        !selectedBet.selectionId
+      ) {
         toast.dismiss();
         toast.error("Unable to place bet", {
           description: "Please select odds and enter stake amount",
@@ -862,6 +880,8 @@ export default function LiveMatch() {
         betoption_id: selectedBet.betoption_id,
         betquestion_id: selectedBet.betquestion_id,
         match_id: selectedBet.match_id,
+        selection_id: selectedBet.selectionId,
+        level: selectedBet.level || 0, // Include level parameter, default to 0 if not set
         isback:
           selectedBet.type.toLowerCase() === "back" ||
           selectedBet.type.toLowerCase() === "no"
@@ -945,7 +965,8 @@ export default function LiveMatch() {
   const handleOddsClick = (
     runner: Runner | BookmakerRunner | FancyOdds,
     type: "back" | "lay" | "no" | "yes",
-    section: "match" | "bookmaker" | "fancy"
+    section: "match" | "bookmaker" | "fancy",
+    index: number = 0 // Add index parameter with default value
   ) => {
     setBetError(null);
 
@@ -958,8 +979,8 @@ export default function LiveMatch() {
         if (!runner.ex) return;
         const odds =
           type === "back"
-            ? runner.ex.availableToBack?.[0]
-            : runner.ex.availableToLay?.[0];
+            ? runner.ex.availableToBack?.[index]
+            : runner.ex.availableToLay?.[index];
 
         // Check if odds are suspended
         isSuspended =
@@ -990,6 +1011,7 @@ export default function LiveMatch() {
           betquestion_id: betData.Question_id,
           match_id: Number(betData.Match_id),
           selectionId: runner.selectionId,
+          level: index, // Include level in setSelectedBet
         });
 
         setSelectedOdds(oddsValue);
@@ -1032,20 +1054,21 @@ export default function LiveMatch() {
 
   const handleBookmakerBet = (
     runner: BookmakerRunner,
-    type: "back" | "lay"
+    type: "back" | "lay",
+    index: number
   ) => {
     if (runner.status === "SUSPENDED") return;
 
     const odds =
       type === "back"
-        ? runner.ex?.availableToBack?.[0]?.price
-        : runner.ex?.availableToLay?.[0]?.price;
+        ? runner.ex?.availableToBack?.[index]?.price
+        : runner.ex?.availableToLay?.[index]?.price;
 
     if (!odds) return;
 
-    // Find the matching mapping for this runner
+    // Find the matching mapping for this runner (selectionId is already string)
     const mapping = bookmakerMappings.find(
-      (m) => m.SelectionId === runner.selectionId.toString()
+      (m) => m.SelectionId === runner.selectionId
     );
 
     if (!mapping) {
@@ -1061,7 +1084,8 @@ export default function LiveMatch() {
       betoption_id: mapping.Option_id,
       betquestion_id: mapping.Question_id,
       match_id: Number(mapping.Match_id),
-      selectionId: runner.selectionId,
+      selectionId: mapping.SelectionId,
+      level: index,
     });
 
     setSelectedOdds(odds.toFixed(2));
@@ -1127,7 +1151,6 @@ export default function LiveMatch() {
       });
 
       const data = await response.json();
-      // Find the latest pending bet for the current match
       const pendingBets =
         data.logs?.filter((log: any) => log.status === "0") || [];
 
@@ -1137,11 +1160,19 @@ export default function LiveMatch() {
         return;
       }
 
-      // Get the most recent bet
       const latestBet = pendingBets[0];
-      const result = await executeCashout({
+      const selectedRunner = eventOdds.runners?.find(
+        (r) => r.selectionId === cashoutSelectionId
+      );
+
+      // Only send required data
+      const cashoutData: CashoutData = {
         bet_invest_id: latestBet.id,
-      });
+        base0: selectedRunner?.ex?.availableToBack?.[0]?.price,
+        base1: selectedRunner?.ex?.availableToLay?.[0]?.price,
+      };
+
+      const result = await executeCashout(cashoutData);
 
       toast.dismiss();
 
@@ -1212,7 +1243,7 @@ export default function LiveMatch() {
               )}
             </div>
 
-            <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
+            <div className="w-full h-[124px] bg-black rounded-lg overflow-hidden">
               {liveMatchData?.iframeScore && (
                 <iframe
                   src={liveMatchData.iframeScore}
@@ -1305,7 +1336,7 @@ export default function LiveMatch() {
                                 key={`back-${i}`}
                                 onClick={() =>
                                   isAvailable &&
-                                  handleOddsClick(runner, "back", "match")
+                                  handleOddsClick(runner, "back", "match", i)
                                 }
                                 className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${
                                   isAvailable ? "cursor-pointer" : "opacity-90"
@@ -1339,7 +1370,7 @@ export default function LiveMatch() {
                                 key={`lay-${i}`}
                                 onClick={() =>
                                   isAvailable &&
-                                  handleOddsClick(runner, "lay", "match")
+                                  handleOddsClick(runner, "lay", "match", i)
                                 }
                                 className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${
                                   isAvailable ? "cursor-pointer" : "opacity-90"
@@ -1432,7 +1463,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[0].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[0],
-                                "back"
+                                "back",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
@@ -1457,7 +1489,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[0].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[0],
-                                "lay"
+                                "lay",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
@@ -1514,7 +1547,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[1].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[1],
-                                "back"
+                                "back",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
@@ -1539,7 +1573,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[1].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[1],
-                                "lay"
+                                "lay",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"

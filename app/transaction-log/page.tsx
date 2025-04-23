@@ -1,145 +1,200 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import ProfileSidebar from "@/components/shared/ProfileSidebar"
+import { useEffect, useState } from "react";
+import ProfileSidebar from "@/components/shared/ProfileSidebar";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Transaction {
-    id: number
-    trans_id: string
-    description: string
-    amount: string
-    old_bal: string
-    new_bal: string
-    type: string | null
-    status: string
-    created_at: string
-    title: string
-    trx: string
-    main_amo: string
-    charge: string
+  id: number;
+  trans_id: string;
+  description: string;
+  amount: string;
+  old_bal: string;
+  new_bal: string;
+  type: string | null;
+  status: string;
+  created_at: string;
+  title: string;
+  trx: string;
+  main_amo: string;
+  charge: string;
 }
 
 interface TransactionResponse {
-    page_title: string
-    trans: {
-        data: Transaction[]
-        current_page: number
-        last_page: number
-        total: number
-    }
-    success: boolean
+  page_title: string;
+  trans: {
+    data: Transaction[];
+    current_page: number;
+    last_page: number;
+    total: number;
+  };
+  success: boolean;
 }
 
 export default function TransactionLogPage() {
-    const [transactions, setTransactions] = useState<Transaction[]>([])
-    const [loading, setLoading] = useState(true)
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchTransactions()
-    }, [])
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
-    const fetchTransactions = async () => {
-        try {
-            const token = localStorage.getItem('auth_token')
-            if (!token) throw new Error('Authentication required')
+  const fetchTransactions = async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      if (!token) throw new Error("Authentication required");
 
-            const response = await fetch('https://book2500.funzip.in/api/transaction-log', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            })
-
-            if (!response.ok) throw new Error('Failed to fetch transactions')
-
-            const data: TransactionResponse = await response.json()
-            setTransactions(data.trans.data || [])
-        } catch (error) {
-            console.error('Failed to fetch transactions:', error)
-            setTransactions([])
-        } finally {
-            setLoading(false)
+      const response = await fetch(
+        "https://book2500.funzip.in/api/transaction-log",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch transactions");
+
+      const data: TransactionResponse = await response.json();
+      setTransactions(data.trans.data || []);
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return (
-        <div className="container mx-auto">
-            <div className="grid gap-6 md:grid-cols-9 pt-6">
-                <ProfileSidebar />
-                <div className="md:col-span-9">
-                    <div className="bg-brand-darkPurple rounded-lg shadow-xl p-4">
-                        <h1 className="text-xl md:text-2xl font-bold text-white mb-4">Transaction History</h1>
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    });
+  };
 
-                        {loading ? (
-                            <div className="flex items-center justify-center p-8">
-                                <div className="text-white">Loading transactions...</div>
-                            </div>
-                        ) : (
-                            <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                                <div className="inline-block min-w-full py-2 align-middle px-4 sm:px-6 lg:px-8">
-                                    <div className="overflow-hidden ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                                        <table className="min-w-full divide-y divide-gray-700">
-                                            <thead className="bg-brand-purple">
-                                                <tr>
-                                                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-300 sm:px-4">
-                                                        Date
-                                                    </th>
-                                                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-gray-300 sm:px-4">
-                                                        TRX
-                                                    </th>
-                                                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-300 sm:px-4">
-                                                        Amount
-                                                    </th>
-                                                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-gray-300 sm:px-4">
-                                                        Balance
-                                                    </th>
-                                                    {/* <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-300 sm:px-4">
-                                                        Details
-                                                    </th> */}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-700">
-                                                {transactions.map((tx) => (
-                                                    <tr key={tx.id} className="hover:bg-purple-900/50">
-                                                        <td className="whitespace-nowrap px-3 py-3 text-xs sm:text-sm text-white sm:px-4">
-                                                            {new Date(tx.created_at).toLocaleDateString()}
-                                                            <div className="md:hidden text-[10px] text-gray-400 mt-1">
-                                                                {tx.trx}
-                                                            </div>
-                                                        </td>
-                                                        <td className="hidden md:table-cell whitespace-nowrap px-3 py-3 text-xs sm:text-sm text-gray-300 sm:px-4">
-                                                            {tx.trx}
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-3 py-3 text-xs sm:text-sm sm:px-4">
-                                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-medium ${tx.type === '+'
-                                                                ? 'bg-green-100 text-green-800'
-                                                                : 'bg-red-100 text-red-800'
-                                                                }`}>
-                                                                ₹{tx.amount}
-                                                            </span>
-                                                            <div className="sm:hidden text-[10px] text-gray-400 mt-1">
-                                                                Balance: ₹{tx.new_bal}
-                                                            </div>
-                                                        </td>
-                                                        <td className="hidden sm:table-cell whitespace-nowrap px-3 py-3 text-xs sm:text-sm text-white sm:px-4">
-                                                            ₹{tx.new_bal}
-                                                        </td>
-                                                        {/* <td className="px-3 py-3 text-xs sm:text-sm text-gray-300 sm:px-4">
-                                                            <div className="max-w-[150px] sm:max-w-xs truncate">
-                                                                {tx.description}
-                                                            </div>
-                                                        </td> */}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+  return (
+    <div className="container mx-auto px-4 py-4 md:py-8">
+      <div className="grid gap-6 md:grid-cols-12">
+        <ProfileSidebar />
+        <div className="md:col-span-9">
+          <div className="bg-brand-darkPurple rounded-lg shadow-xl p-4 md:p-6">
+            <h1 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6">
+              Transaction History
+            </h1>
+
+            {loading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex flex-col space-y-3">
+                    <Skeleton className="h-12 w-full bg-brand-purple/50 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                No transaction history found
+              </div>
+            ) : (
+              <>
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-brand-purple">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-300"
+                        >
+                          Date
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-300"
+                        >
+                          TRX
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-300"
+                        >
+                          Amount
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-300"
+                        >
+                          Balance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-brand-purple/20">
+                          <td className="px-4 py-3 text-sm text-white">
+                            {formatDate(tx.created_at)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-300">
+                            {tx.trx}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Badge
+                              className={`${
+                                tx.type === "+"
+                                  ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                                  : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                              }`}
+                            >
+                              ₹{tx.amount}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-white">
+                            ₹{tx.new_bal}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-            </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden space-y-4">
+                  {transactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="bg-brand-purple/20 p-4 rounded-lg border border-gray-700"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="text-sm text-white font-medium">
+                          {formatDate(tx.created_at)}
+                        </div>
+                        <Badge
+                          className={`${
+                            tx.type === "+"
+                              ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                              : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                          }`}
+                        >
+                          ₹{tx.amount}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="text-gray-400">Transaction ID:</div>
+                        <div className="text-white truncate">{tx.trx}</div>
+
+                        <div className="text-gray-400">Balance:</div>
+                        <div className="text-white">₹{tx.new_bal}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-    )
+      </div>
+    </div>
+  );
 }
