@@ -1,7 +1,7 @@
 interface LiveMatchData {
   eventId: string;
   tv: string;
-  iframeScore: string;
+  iframeScoreV1: string;
 }
 
 async function fetchLiveMatchData(matchId: string) {
@@ -61,9 +61,9 @@ export default async function LiveMatchEmbed({
 
       {/* Score Container */}
       <div className="h-[124px]">
-        {matchData.iframeScore && (
+        {matchData.iframeScoreV1 && (
           <iframe
-            src={matchData.iframeScore}
+            src={matchData.iframeScoreV1}
             className="w-full h-full border-0"
             scrolling="no"
           />

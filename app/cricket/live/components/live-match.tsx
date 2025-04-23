@@ -214,8 +214,11 @@ interface CashoutDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   profitLoss?: {
-    amount: number;
-    type: "profit" | "loss";
+    selectedTeam: string;
+    otherTeam: string;
+    selectedTeamAmount: number;
+    otherTeamAmount: number;
+    section: string;
   };
 }
 
@@ -329,6 +332,18 @@ interface CashoutData {
   base1: string; // opposite of placed bet ratio
 }
 
+interface BetLog {
+  id: string;
+  status: string;
+  invest_amount: string;
+  ratio: string;
+  selection_id: string;
+  isback: number;
+  level: number;
+  section: string; // "MATCH" or "BOOKMAKER"
+  created_at: string;
+}
+
 function CashoutDialog({
   isOpen,
   onClose,
@@ -340,22 +355,42 @@ function CashoutDialog({
       <DialogContent className="bg-[#2D1A4A] border border-purple-900">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
-            Confirm Cashout
+            Confirm {profitLoss?.section} Cashout
           </DialogTitle>
           <DialogDescription>
-            <span className="text-gray-300">
+            <span className="text-gray-300 block mb-4">
               Do you want to proceed with the cashout?
             </span>
             {profitLoss && (
-              <div
-                className={`mt-4 text-lg font-semibold ${
-                  profitLoss.type === "profit"
-                    ? "text-green-400"
-                    : "text-red-400"
-                }`}
-              >
-                {profitLoss.type === "profit" ? "+" : "-"}₹
-                {Math.abs(profitLoss.amount).toFixed(2)}
+              <div className="bg-[#3a2255] rounded-lg p-4 border border-purple-900">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">
+                    {profitLoss.selectedTeam}
+                  </span>
+                  <span
+                    className={`font-medium ${
+                      profitLoss.selectedTeamAmount > 0
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {profitLoss.selectedTeamAmount > 0 ? "+" : ""}₹
+                    {Math.abs(profitLoss.selectedTeamAmount).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-gray-300">{profitLoss.otherTeam}</span>
+                  <span
+                    className={`font-medium ${
+                      profitLoss.otherTeamAmount > 0
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {profitLoss.otherTeamAmount > 0 ? "+" : ""}₹
+                    {Math.abs(profitLoss.otherTeamAmount).toFixed(2)}
+                  </span>
+                </div>
               </div>
             )}
           </DialogDescription>
@@ -427,9 +462,16 @@ export default function LiveMatch() {
     BookmakerMapping[]
   >([]);
   const [cashoutProfitLoss, setCashoutProfitLoss] = useState<{
-    amount: number;
-    type: "profit" | "loss";
+    selectedTeam: string;
+    otherTeam: string;
+    selectedTeamAmount: number;
+    otherTeamAmount: number;
+    section: string;
   } | null>(null);
+  const [recentBets, setRecentBets] = useState<BetLog[]>([]);
+  const [profitLossMap, setProfitLossMap] = useState<{ [key: string]: number }>(
+    {}
+  );
 
   const handleFancyOddsUpdate = useCallback(
     (realtimeOdds: RealTimeFancyOdds[]) => {
@@ -507,6 +549,7 @@ export default function LiveMatch() {
         });
         const data: LiveMatchData[] = await response.json();
         const matchData = data.find((match) => match.eventId === eventId);
+        // console.log(matchData);
         setLiveMatchData(matchData || null);
 
         setIsMatchLive(!!matchData?.tv);
@@ -820,6 +863,87 @@ export default function LiveMatch() {
     const interval = setInterval(fetchBookmakerOdds, 1000);
     return () => clearInterval(interval);
   }, [fetchBookmakerOdds]);
+
+  const fetchRecentBets = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("https://book2500.funzip.in/api/bet-log", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      const data = await response.json();
+      if (data.logs) {
+        const pendingBets = data.logs.filter(
+          (log: BetLog) => log.status === "0"
+        );
+        setRecentBets(pendingBets);
+      }
+    } catch (error) {
+      console.error("Error fetching recent bets:", error);
+    }
+  }, []);
+
+  const calculateProfitLoss = useCallback(() => {
+    const newProfitLossMap: { [key: string]: number } = {};
+
+    recentBets.forEach((bet) => {
+      let runners;
+      if (bet.section === "MATCH") {
+        runners = eventOdds.runners;
+      } else if (bet.section === "BOOKMAKER") {
+        runners = bookmakerMarket?.runners.map((runner) => ({
+          selectionId: runner.selectionId,
+          ex: {
+            availableToBack: runner.ex.availableToBack,
+            availableToLay: runner.ex.availableToLay,
+          },
+        }));
+      }
+
+      if (!runners) return;
+
+      const investAmount = Number(bet.invest_amount);
+      const selectedRunner = runners.find(
+        (r) => r.selectionId === bet.selection_id
+      );
+      if (!selectedRunner?.ex) return;
+
+      const currentOdds =
+        bet.isback === 1
+          ? selectedRunner.ex.availableToBack?.[bet.level]?.price
+          : selectedRunner.ex.availableToLay?.[bet.level]?.price;
+
+      if (!currentOdds) return;
+
+      const profit =
+        bet.isback === 1
+          ? currentOdds * investAmount - investAmount
+          : investAmount - currentOdds * investAmount;
+
+      newProfitLossMap[bet.selection_id] =
+        (newProfitLossMap[bet.selection_id] || 0) + profit;
+    });
+
+    setProfitLossMap(newProfitLossMap);
+  }, [recentBets, eventOdds.runners, bookmakerMarket?.runners]);
+
+  useEffect(() => {
+    fetchRecentBets();
+    const interval = setInterval(fetchRecentBets, 5000);
+    return () => clearInterval(interval);
+  }, [fetchRecentBets]);
+
+  useEffect(() => {
+    calculateProfitLoss();
+  }, [
+    calculateProfitLoss,
+    recentBets,
+    eventOdds.runners,
+    bookmakerMarket?.runners,
+  ]);
 
   const handleStakeButton = (
     type: "min" | "max" | "predefined",
@@ -1214,16 +1338,20 @@ export default function LiveMatch() {
 
       // Find the runners based on bet section
       let runners;
+      let section = "";
       if (cashoutType === "match-odds") {
         runners = eventOdds.runners;
+        section = "MATCH";
       } else if (cashoutType === "bookmaker-odds") {
         runners = bookmakerMarket?.runners.map((runner) => ({
           selectionId: runner.selectionId,
+          runner: runner.runnerName,
           ex: {
             availableToBack: runner.ex.availableToBack,
             availableToLay: runner.ex.availableToLay,
           },
         }));
+        section = "BOOKMAKER";
       }
 
       if (!runners || runners.length < 2) {
@@ -1232,7 +1360,7 @@ export default function LiveMatch() {
         return;
       }
 
-      // Calculate potential profit/loss
+      // Find selected runner and opposite runner
       const selectedRunner = runners.find(
         (r) => r.selectionId === latestBet.selection_id
       );
@@ -1262,16 +1390,25 @@ export default function LiveMatch() {
         return;
       }
 
-      // Calculate estimated profit/loss
+      // Calculate profit/loss for each team
       const investAmount = Number(latestBet.invest_amount);
-      const profitLoss =
-        latestBet.isback === 1
-          ? (base1 - base0) * investAmount
-          : (base0 - base1) * investAmount;
+      const isBack = latestBet.isback === 1;
 
+      const selectedTeamAmount = isBack
+        ? base0 * investAmount - investAmount
+        : -(base0 * investAmount - investAmount);
+
+      const otherTeamAmount = isBack
+        ? -(base1 * investAmount - investAmount)
+        : base1 * investAmount - investAmount;
+
+      // Update dialog with profit/loss info
       setCashoutProfitLoss({
-        amount: profitLoss,
-        type: profitLoss >= 0 ? "profit" : "loss",
+        selectedTeam: selectedRunner.runner,
+        otherTeam: oppositeRunner.runner,
+        selectedTeamAmount,
+        otherTeamAmount,
+        section,
       });
 
       const cashoutData: CashoutData = {
@@ -1315,8 +1452,11 @@ export default function LiveMatch() {
       // Calculate profit/loss for display
       const profitAmount = 100; // Replace with actual calculation
       setCashoutProfitLoss({
-        amount: profitAmount,
-        type: profitAmount >= 0 ? "profit" : "loss",
+        selectedTeam: "",
+        otherTeam: "",
+        selectedTeamAmount: profitAmount,
+        otherTeamAmount: -profitAmount,
+        section: "",
       });
 
       setShowCashoutDialog(true);
@@ -1362,7 +1502,7 @@ export default function LiveMatch() {
             <div className="w-full h-[124px] bg-black rounded-lg overflow-hidden">
               {liveMatchData?.iframeScore && (
                 <iframe
-                  src={liveMatchData.iframeScore}
+                  src={liveMatchData.iframeScoreV1}
                   className="w-full h-full border-0"
                   scrolling="no"
                   style={{
@@ -1429,8 +1569,27 @@ export default function LiveMatch() {
 
                     return (
                       <div key={idx} className="border-b border-purple-900">
-                        <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                          {runner.runner}
+                        <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
+                          <span>{runner.runner}</span>
+                          <span
+                            className={`${
+                              profitLossMap[runner.selectionId] > 0
+                                ? "text-green-400"
+                                : profitLossMap[runner.selectionId] < 0
+                                ? "text-red-400"
+                                : "text-gray-400"
+                            } mr-4`}
+                          >
+                            {profitLossMap[runner.selectionId]
+                              ? `${
+                                  profitLossMap[runner.selectionId] > 0
+                                    ? "+"
+                                    : ""
+                                }₹${Math.abs(
+                                  profitLossMap[runner.selectionId]
+                                ).toFixed(2)}`
+                              : "-"}
+                          </span>
                         </div>
                         <div className="grid grid-cols-6 w-full relative">
                           {isSuspended && (
@@ -1560,8 +1719,35 @@ export default function LiveMatch() {
                       key={bookmakerMarket.runners[0].selectionId}
                       className="border-b border-purple-900"
                     >
-                      <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                        {bookmakerMarket.runners[0].runnerName}
+                      <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
+                        <span>{bookmakerMarket.runners[0].runnerName}</span>
+                        <span
+                          className={`${
+                            profitLossMap[
+                              bookmakerMarket.runners[0].selectionId
+                            ] > 0
+                              ? "text-green-400"
+                              : profitLossMap[
+                                  bookmakerMarket.runners[0].selectionId
+                                ] < 0
+                              ? "text-red-400"
+                              : "text-gray-400"
+                          } mr-4`}
+                        >
+                          {profitLossMap[bookmakerMarket.runners[0].selectionId]
+                            ? `${
+                                profitLossMap[
+                                  bookmakerMarket.runners[0].selectionId
+                                ] > 0
+                                  ? "+"
+                                  : ""
+                              }₹${Math.abs(
+                                profitLossMap[
+                                  bookmakerMarket.runners[0].selectionId
+                                ]
+                              ).toFixed(2)}`
+                            : "-"}
+                        </span>
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[0].status === "SUSPENDED" && (
@@ -1644,8 +1830,35 @@ export default function LiveMatch() {
                       key={bookmakerMarket.runners[1].selectionId}
                       className="border-b border-purple-900"
                     >
-                      <div className="text-white font-bold pl-4 py-2 bg-[#231439]">
-                        {bookmakerMarket.runners[1].runnerName}
+                      <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
+                        <span>{bookmakerMarket.runners[1].runnerName}</span>
+                        <span
+                          className={`${
+                            profitLossMap[
+                              bookmakerMarket.runners[1].selectionId
+                            ] > 0
+                              ? "text-green-400"
+                              : profitLossMap[
+                                  bookmakerMarket.runners[1].selectionId
+                                ] < 0
+                              ? "text-red-400"
+                              : "text-gray-400"
+                          } mr-4`}
+                        >
+                          {profitLossMap[bookmakerMarket.runners[1].selectionId]
+                            ? `${
+                                profitLossMap[
+                                  bookmakerMarket.runners[1].selectionId
+                                ] > 0
+                                  ? "+"
+                                  : ""
+                              }₹${Math.abs(
+                                profitLossMap[
+                                  bookmakerMarket.runners[1].selectionId
+                                ]
+                              ).toFixed(2)}`
+                            : "-"}
+                        </span>
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[1].status === "SUSPENDED" && (
@@ -1759,7 +1972,6 @@ export default function LiveMatch() {
                   </div>
 
                   <div className="space-y-2">
-                    {/* Sort fancyOddsMappings based on SelectionId */}
                     {fancyOddsMappings
                       .sort((a, b) => {
                         const selectionIdA =
@@ -1776,12 +1988,12 @@ export default function LiveMatch() {
                             key={`${odd.Question_id}-${idx}`}
                             className="border-b border-purple-900 last:border-b-0"
                           >
-                            <div className="text-white font-bold pl-4 py-2 ">
+                            <div className="text-white font-bold pl-4 py-2">
                               {odd.RunnerName}
                             </div>
                             <div className="grid grid-cols-2 gap-2 p-2 relative">
                               {isSuspended && (
-                                <div className="absolute inset-0  flex items-center justify-center z-10">
+                                <div className="absolute inset-0 flex items-center justify-center z-10">
                                   <span className="text-red-500 font-bold text-lg">
                                     SUSPENDED
                                   </span>
