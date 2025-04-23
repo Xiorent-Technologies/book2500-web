@@ -943,54 +943,68 @@ export default function LiveMatch() {
         });
 
         const data = await response.json();
-        if (data.logs) {
-          // Sort by created_at to get most recent first
-          const sortedLogs = [...data.logs].sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-          );
 
-          // Get only the latest bet
-          const latestBet = sortedLogs[0];
+        // Create new bet maps object
+        const newBetMaps: { [key: string]: any } = {};
 
-          if (
-            latestBet &&
-            !latestBet.is_cashed_out &&
-            latestBet.status === "0"
-          ) {
-            const investAmount = parseFloat(latestBet.invest_amount || "0.0");
-            const returnAmount = parseFloat(latestBet.return_amount || "0.0");
-            const liability = parseFloat(latestBet.liability || "0.0");
-            const isBack = latestBet.is_back === 1;
+        if (data.success) {
+          // Handle Match Odds potential profit/loss
+          if (data.potential_invest_matchodds) {
+            const investAmount = parseFloat(data.potential_invest_matchodds);
+            const returnAmount = parseFloat(data.potential_return_matchodds);
+            const isBack = data.is_back_matchodds === 1;
+            const selectionId = data.selection_id_matchodds;
 
-            // Create object for both selected and opposite runners
-            const newBetMaps: { [key: string]: any } = {};
-
-            // For selected runner
-            newBetMaps[latestBet.selection_id] = {
-              amount: isBack ? returnAmount - investAmount : -liability,
+            // For selected runner in Match Odds
+            newBetMaps[selectionId] = {
+              amount: isBack ? returnAmount - investAmount : -returnAmount,
               isBack,
-              created_at: latestBet.created_at,
+              section: "MATCH",
             };
 
-            // Find the opposite runner ID from event odds
+            // Find and set opposite runner
             const oppositeRunner = eventOdds.runners.find(
-              (runner) => runner.selectionId !== latestBet.selection_id
+              (runner) => runner.selectionId !== selectionId
             );
 
             if (oppositeRunner) {
               newBetMaps[oppositeRunner.selectionId] = {
                 amount: isBack ? -investAmount : investAmount,
                 isBack,
-                created_at: latestBet.created_at,
+                section: "MATCH",
               };
             }
-
-            setBetMaps(newBetMaps);
-          } else {
-            setBetMaps({});
           }
+
+          // Handle Bookmaker potential profit/loss
+          if (data.potential_invest_bookmaker) {
+            const investAmount = parseFloat(data.potential_invest_bookmaker);
+            const returnAmount = parseFloat(data.potential_return_bookmaker);
+            const isBack = data.is_back_bookmaker === 1;
+            const selectionId = data.selection_id_bookmaker;
+
+            // For selected runner in Bookmaker
+            newBetMaps[selectionId] = {
+              amount: isBack ? returnAmount - investAmount : -returnAmount,
+              isBack,
+              section: "BOOKMAKER",
+            };
+
+            // Find and set opposite runner
+            const oppositeRunner = bookmakerMarket?.runners.find(
+              (runner) => runner.selectionId !== selectionId
+            );
+
+            if (oppositeRunner) {
+              newBetMaps[oppositeRunner.selectionId] = {
+                amount: isBack ? -investAmount : investAmount,
+                isBack,
+                section: "BOOKMAKER",
+              };
+            }
+          }
+
+          setBetMaps(newBetMaps);
         }
       } catch (error) {
         console.error("Error fetching bet maps:", error);
@@ -998,9 +1012,8 @@ export default function LiveMatch() {
     };
 
     fetchBetMaps();
-    const interval = setInterval(fetchBetMaps, 5000);
-    return () => clearInterval(interval);
-  }, [eventOdds.runners]);
+    // Don't set up polling interval - only fetch on successful bet
+  }, [eventOdds.runners, bookmakerMarket?.runners]);
 
   const handleStakeButton = (
     type: "min" | "max" | "predefined",
@@ -1134,6 +1147,9 @@ export default function LiveMatch() {
         }
         return;
       }
+
+      // Fetch fresh bet logs to get updated potential profit/loss
+      await fetchBetMaps();
 
       toast.success("Bet placed successfully!", {
         description: `${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}\nMarket: ${selectedBet.section}`,
@@ -1564,7 +1580,6 @@ export default function LiveMatch() {
                   scrolling="no"
                   style={{
                     pointerEvents: "none",
-                    userSelect: "none",
                   }}
                 />
               )}
@@ -1603,7 +1618,6 @@ export default function LiveMatch() {
                   </div>
                 </div>
               </div>
-
               {expandedSections.matchOdds && (
                 <div className="p-0">
                   <div className="grid grid-cols-2 w-full">
