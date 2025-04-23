@@ -213,6 +213,10 @@ interface CashoutDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  profitLoss?: {
+    amount: number;
+    type: "profit" | "loss";
+  };
 }
 
 interface PredictionData {
@@ -325,7 +329,12 @@ interface CashoutData {
   base1: string; // opposite of placed bet ratio
 }
 
-function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
+function CashoutDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  profitLoss,
+}: CashoutDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-[#2D1A4A] border border-purple-900">
@@ -333,8 +342,22 @@ function CashoutDialog({ isOpen, onClose, onConfirm }: CashoutDialogProps) {
           <DialogTitle className="text-xl font-bold text-white">
             Confirm Cashout
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
-            Do you want to proceed with the cashout?
+          <DialogDescription>
+            <span className="text-gray-300">
+              Do you want to proceed with the cashout?
+            </span>
+            {profitLoss && (
+              <div
+                className={`mt-4 text-lg font-semibold ${
+                  profitLoss.type === "profit"
+                    ? "text-green-400"
+                    : "text-red-400"
+                }`}
+              >
+                {profitLoss.type === "profit" ? "+" : "-"}₹
+                {Math.abs(profitLoss.amount).toFixed(2)}
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex justify-end gap-4 mt-6">
@@ -403,6 +426,10 @@ export default function LiveMatch() {
   const [bookmakerMappings, setBookmakerMappings] = useState<
     BookmakerMapping[]
   >([]);
+  const [cashoutProfitLoss, setCashoutProfitLoss] = useState<{
+    amount: number;
+    type: "profit" | "loss";
+  } | null>(null);
 
   const handleFancyOddsUpdate = useCallback(
     (realtimeOdds: RealTimeFancyOdds[]) => {
@@ -1107,18 +1134,41 @@ export default function LiveMatch() {
     const profit = stake * odds - stake;
     const potentialReturn = stake + profit;
 
-    const otherTeam =
-      eventOdds.runners?.find((r) => r.runner !== selectedBet?.name)?.runner ||
-      "";
+    // Find the teams based on section
+    let selectedTeam = "";
+    let otherTeam = "";
+
+    if (
+      selectedBet?.section === "MATCH" ||
+      selectedBet?.section === "BOOKMAKER"
+    ) {
+      // For match odds and bookmaker, get team names from runners
+      selectedTeam = selectedBet?.name || "";
+      otherTeam =
+        eventOdds.runners?.find((r) => r.runner !== selectedBet?.name)
+          ?.runner || "";
+    } else if (selectedBet?.section === "FANCY") {
+      // For fancy bets, just use the selected option name
+      selectedTeam = selectedBet?.name || "";
+      otherTeam = ""; // No other team for fancy bets
+    }
+
+    // Calculate profit/loss for each team based on bet type
+    const isBack = selectedBet?.type === "BACK" || selectedBet?.type === "NO";
+    const profitAmount = Math.abs(profit);
+    const stakeAmount = Math.abs(stake);
 
     return {
       stake,
-      profit,
+      profit: profitAmount,
       odds,
       potentialReturn,
-      selectedTeam: selectedBet?.name || "",
+      selectedTeam,
       otherTeam,
-      isback: selectedBet?.type === "BACK",
+      isback: isBack,
+      // Add separate profit/loss amounts for each team
+      selectedTeamAmount: isBack ? profitAmount : -stakeAmount,
+      otherTeamAmount: isBack ? -stakeAmount : profitAmount,
     };
   }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
@@ -1161,15 +1211,73 @@ export default function LiveMatch() {
       }
 
       const latestBet = pendingBets[0];
-      const selectedRunner = eventOdds.runners?.find(
-        (r) => r.selectionId === cashoutSelectionId
+
+      // Find the runners based on bet section
+      let runners;
+      if (cashoutType === "match-odds") {
+        runners = eventOdds.runners;
+      } else if (cashoutType === "bookmaker-odds") {
+        runners = bookmakerMarket?.runners.map((runner) => ({
+          selectionId: runner.selectionId,
+          ex: {
+            availableToBack: runner.ex.availableToBack,
+            availableToLay: runner.ex.availableToLay,
+          },
+        }));
+      }
+
+      if (!runners || runners.length < 2) {
+        toast.dismiss();
+        toast.error("Market data not available");
+        return;
+      }
+
+      // Calculate potential profit/loss
+      const selectedRunner = runners.find(
+        (r) => r.selectionId === latestBet.selection_id
+      );
+      const oppositeRunner = runners.find(
+        (r) => r.selectionId !== latestBet.selection_id
       );
 
-      // Only send required data
+      if (!selectedRunner?.ex || !oppositeRunner?.ex) {
+        toast.dismiss();
+        toast.error("Unable to find matching odds for cashout");
+        return;
+      }
+
+      const base0 =
+        latestBet.isback === 1
+          ? selectedRunner.ex.availableToBack?.[latestBet.level || 0]?.price
+          : selectedRunner.ex.availableToLay?.[latestBet.level || 0]?.price;
+
+      const base1 =
+        latestBet.isback === 1
+          ? oppositeRunner.ex.availableToBack?.[latestBet.level || 0]?.price
+          : oppositeRunner.ex.availableToLay?.[latestBet.level || 0]?.price;
+
+      if (!base0 || !base1) {
+        toast.dismiss();
+        toast.error("Unable to calculate cashout ratios");
+        return;
+      }
+
+      // Calculate estimated profit/loss
+      const investAmount = Number(latestBet.invest_amount);
+      const profitLoss =
+        latestBet.isback === 1
+          ? (base1 - base0) * investAmount
+          : (base0 - base1) * investAmount;
+
+      setCashoutProfitLoss({
+        amount: profitLoss,
+        type: profitLoss >= 0 ? "profit" : "loss",
+      });
+
       const cashoutData: CashoutData = {
         bet_invest_id: latestBet.id,
-        base0: selectedRunner?.ex?.availableToBack?.[0]?.price,
-        base1: selectedRunner?.ex?.availableToLay?.[0]?.price,
+        base0: base0.toString(),
+        base1: base1.toString(),
       };
 
       const result = await executeCashout(cashoutData);
@@ -1203,6 +1311,14 @@ export default function LiveMatch() {
       e.stopPropagation();
       setCashoutType(type);
       if (selectionId) setCashoutSelectionId(selectionId);
+
+      // Calculate profit/loss for display
+      const profitAmount = 100; // Replace with actual calculation
+      setCashoutProfitLoss({
+        amount: profitAmount,
+        type: profitAmount >= 0 ? "profit" : "loss",
+      });
+
       setShowCashoutDialog(true);
     },
     []
@@ -1378,7 +1494,7 @@ export default function LiveMatch() {
                                   i === 0
                                     ? "bg-[#ff9393]"
                                     : i === 1
-                                    ? "bg-[#ff9393] "
+                                    ? "bg-[#ff9393]"
                                     : "bg-[#ff9393]"
                                 }`}
                               >
@@ -1754,41 +1870,51 @@ export default function LiveMatch() {
                       </div>
 
                       <div className="space-y-2 pt-2 border-t border-purple-800">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-300">
-                            {calculateReturns()?.selectedTeam}
-                          </span>
-                          <span
-                            className={`font-medium ${
-                              calculateReturns()?.isback
-                                ? "text-green-400"
-                                : "text-red-400"
-                            }`}
-                          >
-                            {calculateReturns()?.isback ? "+" : "-"}₹
-                            {Math.abs(calculateReturns()?.profit || 0).toFixed(
-                              0
-                            )}
-                          </span>
-                        </div>
+                        {calculateReturns()?.selectedTeam && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-300">
+                              {calculateReturns()?.selectedTeam}
+                            </span>
+                            <span
+                              className={`font-medium ${
+                                calculateReturns()?.selectedTeamAmount > 0
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {calculateReturns()?.selectedTeamAmount > 0
+                                ? "+"
+                                : ""}
+                              ₹
+                              {Math.abs(
+                                calculateReturns()?.selectedTeamAmount || 0
+                              ).toFixed(0)}
+                            </span>
+                          </div>
+                        )}
 
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-300">
-                            {calculateReturns()?.otherTeam}
-                          </span>
-                          <span
-                            className={`font-medium ${
-                              calculateReturns()?.isback
-                                ? "text-red-400"
-                                : "text-green-400"
-                            }`}
-                          >
-                            {calculateReturns()?.isback ? "-" : "+"}₹
-                            {Math.abs(calculateReturns()?.stake || 0).toFixed(
-                              0
-                            )}
-                          </span>
-                        </div>
+                        {calculateReturns()?.otherTeam && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-300">
+                              {calculateReturns()?.otherTeam}
+                            </span>
+                            <span
+                              className={`font-medium ${
+                                calculateReturns()?.otherTeamAmount > 0
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {calculateReturns()?.otherTeamAmount > 0
+                                ? "+"
+                                : ""}
+                              ₹
+                              {Math.abs(
+                                calculateReturns()?.otherTeamAmount || 0
+                              ).toFixed(0)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1932,37 +2058,49 @@ export default function LiveMatch() {
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-purple-800">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-300">
-                          {calculateReturns()?.selectedTeam}
-                        </span>
-                        <span
-                          className={`font-medium ${
-                            calculateReturns()?.isback
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {calculateReturns()?.isback ? "+" : "-"}₹
-                          {Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
-                        </span>
-                      </div>
+                      {calculateReturns()?.selectedTeam && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300">
+                            {calculateReturns()?.selectedTeam}
+                          </span>
+                          <span
+                            className={`font-medium ${
+                              calculateReturns()?.selectedTeamAmount > 0
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {calculateReturns()?.selectedTeamAmount > 0
+                              ? "+"
+                              : ""}
+                            ₹
+                            {Math.abs(
+                              calculateReturns()?.selectedTeamAmount || 0
+                            ).toFixed(0)}
+                          </span>
+                        </div>
+                      )}
 
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-300">
-                          {calculateReturns()?.otherTeam}
-                        </span>
-                        <span
-                          className={`font-medium ${
-                            calculateReturns()?.isback
-                              ? "text-red-400"
-                              : "text-green-400"
-                          }`}
-                        >
-                          {calculateReturns()?.isback ? "-" : "+"}₹
-                          {Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
-                        </span>
-                      </div>
+                      {calculateReturns()?.otherTeam && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300">
+                            {calculateReturns()?.otherTeam}
+                          </span>
+                          <span
+                            className={`font-medium ${
+                              calculateReturns()?.otherTeamAmount > 0
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {calculateReturns()?.otherTeamAmount > 0 ? "+" : ""}
+                            ₹
+                            {Math.abs(
+                              calculateReturns()?.otherTeamAmount || 0
+                            ).toFixed(0)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2054,6 +2192,7 @@ export default function LiveMatch() {
         isOpen={showCashoutDialog}
         onClose={() => setShowCashoutDialog(false)}
         onConfirm={processCashout}
+        profitLoss={cashoutProfitLoss}
       />
     </div>
   );
