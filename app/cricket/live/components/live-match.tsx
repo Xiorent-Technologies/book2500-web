@@ -344,6 +344,13 @@ interface BetLog {
   created_at: string;
 }
 
+interface BetMap {
+  profit: number;
+  liability: number;
+  isBack: boolean;
+  created_at?: string;
+}
+
 function CashoutDialog({
   isOpen,
   onClose,
@@ -472,6 +479,37 @@ export default function LiveMatch() {
   const [profitLossMap, setProfitLossMap] = useState<{ [key: string]: number }>(
     {}
   );
+  const [betMaps, setBetMaps] = useState<{
+    [key: string]: {
+      amount: number;
+      isBack: boolean;
+      created_at?: string;
+    };
+  }>({});
+
+  const calculateProfitLoss = useCallback(() => {
+    if (!selectedOdds || !selectedStake) return {};
+
+    const stake = Number(selectedStake);
+    const odds = Number(selectedOdds);
+
+    if (isNaN(stake) || isNaN(odds)) return {};
+
+    const profitLossMap: { [key: string]: number } = {};
+
+    // For Match Odds and Bookmaker
+    eventOdds.runners.forEach((runner) => {
+      if (selectedBet && runner.selectionId === selectedBet.selectionId) {
+        // This is the selected runner - calculate potential profit
+        profitLossMap[runner.selectionId] = stake * odds - stake;
+      } else {
+        // This is the opposing runner - will lose stake amount
+        profitLossMap[runner.selectionId] = -stake;
+      }
+    });
+
+    return profitLossMap;
+  }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
   const handleFancyOddsUpdate = useCallback(
     (realtimeOdds: RealTimeFancyOdds[]) => {
@@ -534,7 +572,7 @@ export default function LiveMatch() {
       } catch (error) {
         console.error("Error in balance interval:", error);
       }
-    }, 5000);
+    }, 10000);
 
     return () => clearInterval(balanceInterval);
   }, []);
@@ -875,6 +913,7 @@ export default function LiveMatch() {
       });
 
       const data = await response.json();
+      console.log(data);
       if (data.logs) {
         const pendingBets = data.logs.filter(
           (log: BetLog) => log.status === "0"
@@ -886,50 +925,6 @@ export default function LiveMatch() {
     }
   }, []);
 
-  const calculateProfitLoss = useCallback(() => {
-    const newProfitLossMap: { [key: string]: number } = {};
-
-    recentBets.forEach((bet) => {
-      let runners;
-      if (bet.section === "MATCH") {
-        runners = eventOdds.runners;
-      } else if (bet.section === "BOOKMAKER") {
-        runners = bookmakerMarket?.runners.map((runner) => ({
-          selectionId: runner.selectionId,
-          ex: {
-            availableToBack: runner.ex.availableToBack,
-            availableToLay: runner.ex.availableToLay,
-          },
-        }));
-      }
-
-      if (!runners) return;
-
-      const investAmount = Number(bet.invest_amount);
-      const selectedRunner = runners.find(
-        (r) => r.selectionId === bet.selection_id
-      );
-      if (!selectedRunner?.ex) return;
-
-      const currentOdds =
-        bet.isback === 1
-          ? selectedRunner.ex.availableToBack?.[bet.level]?.price
-          : selectedRunner.ex.availableToLay?.[bet.level]?.price;
-
-      if (!currentOdds) return;
-
-      const profit =
-        bet.isback === 1
-          ? currentOdds * investAmount - investAmount
-          : investAmount - currentOdds * investAmount;
-
-      newProfitLossMap[bet.selection_id] =
-        (newProfitLossMap[bet.selection_id] || 0) + profit;
-    });
-
-    setProfitLossMap(newProfitLossMap);
-  }, [recentBets, eventOdds.runners, bookmakerMarket?.runners]);
-
   useEffect(() => {
     fetchRecentBets();
     const interval = setInterval(fetchRecentBets, 5000);
@@ -937,13 +932,75 @@ export default function LiveMatch() {
   }, [fetchRecentBets]);
 
   useEffect(() => {
-    calculateProfitLoss();
-  }, [
-    calculateProfitLoss,
-    recentBets,
-    eventOdds.runners,
-    bookmakerMarket?.runners,
-  ]);
+    const fetchBetMaps = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        const response = await fetch("https://book2500.funzip.in/api/bet-log", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+
+        const data = await response.json();
+        if (data.logs) {
+          // Sort by created_at to get most recent first
+          const sortedLogs = [...data.logs].sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          );
+
+          // Get only the latest bet
+          const latestBet = sortedLogs[0];
+
+          if (
+            latestBet &&
+            !latestBet.is_cashed_out &&
+            latestBet.status === "0"
+          ) {
+            const investAmount = parseFloat(latestBet.invest_amount || "0.0");
+            const returnAmount = parseFloat(latestBet.return_amount || "0.0");
+            const liability = parseFloat(latestBet.liability || "0.0");
+            const isBack = latestBet.is_back === 1;
+
+            // Create object for both selected and opposite runners
+            const newBetMaps: { [key: string]: any } = {};
+
+            // For selected runner
+            newBetMaps[latestBet.selection_id] = {
+              amount: isBack ? returnAmount - investAmount : -liability,
+              isBack,
+              created_at: latestBet.created_at,
+            };
+
+            // Find the opposite runner ID from event odds
+            const oppositeRunner = eventOdds.runners.find(
+              (runner) => runner.selectionId !== latestBet.selection_id
+            );
+
+            if (oppositeRunner) {
+              newBetMaps[oppositeRunner.selectionId] = {
+                amount: isBack ? -investAmount : investAmount,
+                isBack,
+                created_at: latestBet.created_at,
+              };
+            }
+
+            setBetMaps(newBetMaps);
+          } else {
+            setBetMaps({});
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching bet maps:", error);
+      }
+    };
+
+    fetchBetMaps();
+    const interval = setInterval(fetchBetMaps, 5000);
+    return () => clearInterval(interval);
+  }, [eventOdds.runners]);
 
   const handleStakeButton = (
     type: "min" | "max" | "predefined",
@@ -1559,6 +1616,8 @@ export default function LiveMatch() {
                   </div>
 
                   {eventOdds.runners?.map((runner, idx) => {
+                    const profitLoss =
+                      calculateProfitLoss()[runner.selectionId];
                     const isSuspended = [0, 1, 2].some((index) => {
                       const backOdds =
                         runner.ex?.availableToBack?.[index]?.price ?? 0;
@@ -1571,25 +1630,25 @@ export default function LiveMatch() {
                       <div key={idx} className="border-b border-purple-900">
                         <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                           <span>{runner.runner}</span>
-                          <span
-                            className={`${
-                              profitLossMap[runner.selectionId] > 0
-                                ? "text-green-400"
-                                : profitLossMap[runner.selectionId] < 0
-                                ? "text-red-400"
-                                : "text-gray-400"
-                            } mr-4`}
-                          >
-                            {profitLossMap[runner.selectionId]
-                              ? `${
-                                  profitLossMap[runner.selectionId] > 0
-                                    ? "+"
-                                    : ""
-                                }₹${Math.abs(
-                                  profitLossMap[runner.selectionId]
-                                ).toFixed(2)}`
-                              : "-"}
-                          </span>
+                          {betMaps[runner.selectionId] && (
+                            <div className="mr-4">
+                              <span
+                                className={`font-medium ${
+                                  betMaps[runner.selectionId].amount > 0
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {betMaps[runner.selectionId].amount > 0
+                                  ? "+"
+                                  : ""}
+                                ₹
+                                {Math.abs(
+                                  betMaps[runner.selectionId].amount
+                                ).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="grid grid-cols-6 w-full relative">
                           {isSuspended && (
@@ -1721,33 +1780,35 @@ export default function LiveMatch() {
                     >
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[0].runnerName}</span>
-                        <span
-                          className={`${
-                            profitLossMap[
-                              bookmakerMarket.runners[0].selectionId
-                            ] > 0
-                              ? "text-green-400"
-                              : profitLossMap[
-                                  bookmakerMarket.runners[0].selectionId
-                                ] < 0
-                              ? "text-red-400"
-                              : "text-gray-400"
-                          } mr-4`}
-                        >
-                          {profitLossMap[bookmakerMarket.runners[0].selectionId]
-                            ? `${
-                                profitLossMap[
-                                  bookmakerMarket.runners[0].selectionId
-                                ] > 0
+                        {betMaps[bookmakerMarket.runners[0].selectionId] && (
+                          <div className="space-y-1 flex flex-col items-end mr-4">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-gray-300">
+                                {bookmakerMarket.runners[0].runnerName}
+                              </span>
+                              <span
+                                className={`font-medium ${
+                                  betMaps[
+                                    bookmakerMarket.runners[0].selectionId
+                                  ].amount > 0
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {betMaps[bookmakerMarket.runners[0].selectionId]
+                                  .amount > 0
                                   ? "+"
-                                  : ""
-                              }₹${Math.abs(
-                                profitLossMap[
-                                  bookmakerMarket.runners[0].selectionId
-                                ]
-                              ).toFixed(2)}`
-                            : "-"}
-                        </span>
+                                  : ""}
+                                ₹
+                                {Math.abs(
+                                  betMaps[
+                                    bookmakerMarket.runners[0].selectionId
+                                  ].amount
+                                ).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[0].status === "SUSPENDED" && (
@@ -1832,33 +1893,35 @@ export default function LiveMatch() {
                     >
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[1].runnerName}</span>
-                        <span
-                          className={`${
-                            profitLossMap[
-                              bookmakerMarket.runners[1].selectionId
-                            ] > 0
-                              ? "text-green-400"
-                              : profitLossMap[
-                                  bookmakerMarket.runners[1].selectionId
-                                ] < 0
-                              ? "text-red-400"
-                              : "text-gray-400"
-                          } mr-4`}
-                        >
-                          {profitLossMap[bookmakerMarket.runners[1].selectionId]
-                            ? `${
-                                profitLossMap[
-                                  bookmakerMarket.runners[1].selectionId
-                                ] > 0
+                        {betMaps[bookmakerMarket.runners[1].selectionId] && (
+                          <div className="space-y-1 flex flex-col items-end mr-4">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-gray-300">
+                                {bookmakerMarket.runners[1].runnerName}
+                              </span>
+                              <span
+                                className={`font-medium ${
+                                  betMaps[
+                                    bookmakerMarket.runners[1].selectionId
+                                  ].amount > 0
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {betMaps[bookmakerMarket.runners[1].selectionId]
+                                  .amount > 0
                                   ? "+"
-                                  : ""
-                              }₹${Math.abs(
-                                profitLossMap[
-                                  bookmakerMarket.runners[1].selectionId
-                                ]
-                              ).toFixed(2)}`
-                            : "-"}
-                        </span>
+                                  : ""}
+                                ₹
+                                {Math.abs(
+                                  betMaps[
+                                    bookmakerMarket.runners[1].selectionId
+                                  ].amount
+                                ).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[1].status === "SUSPENDED" && (
