@@ -1066,9 +1066,9 @@ export default function LiveMatch() {
 
     if (!odds) return;
 
-    // Find the matching mapping for this runner (selectionId is already string)
+    // Find the matching mapping for this runner by matching runnerName with Option_name
     const mapping = bookmakerMappings.find(
-      (m) => m.SelectionId === runner.selectionId
+      (m) => m.Option_name.toLowerCase() === runner.runnerName.toLowerCase()
     );
 
     if (!mapping) {
