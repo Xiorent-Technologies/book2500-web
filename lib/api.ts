@@ -91,7 +91,7 @@ interface FancyOddsApiResponse {
 }
 
 interface CashoutData {
-  bet_invest_id: string;
+  bet_invest_id: number;
   base0: number; // Index of the back/lay on which user is betting
   base1: number; // Corresponding opposite index
 }
