@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function fetchUserBalance() {
   const token = localStorage.getItem("auth_token");
   if (!token) return null;

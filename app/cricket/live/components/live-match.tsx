@@ -668,7 +668,7 @@ export default function LiveMatch() {
   useEffect(() => {
     const interval = setInterval(updateFancyOdds, 1500);
     return () => clearInterval(interval);
-  }, [eventId, marketId]);
+  }, [eventId, marketId, updateFancyOdds]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
@@ -775,7 +775,7 @@ export default function LiveMatch() {
   // Initial fetch on mount
   useEffect(() => {
     fetchBetLog();
-  }, []); // Only run once on mount
+  }, [fetchBetLog]); // Add fetchBetLog to dependencies
 
   const handlePlaceBet = async () => {
     if (!isBrowser || !selectedBet) return;
@@ -1315,7 +1315,13 @@ export default function LiveMatch() {
                                 </>
                               ) : (
                                 // For the other team, show the investment amount with opposite sign
-                                <span className="text-xs text-gray-400">
+                                <span
+                                  className={`text-xs ${
+                                    betLogData.is_back_matchodds === 1
+                                      ? "text-red-400"
+                                      : "text-green-400"
+                                  }`}
+                                >
                                   {betLogData.is_back_matchodds === 1
                                     ? "-"
                                     : "+"}
@@ -1487,7 +1493,13 @@ export default function LiveMatch() {
                               </>
                             ) : (
                               // For the other team, show the investment amount with opposite sign
-                              <span className="text-xs text-gray-400">
+                              <span
+                                className={`text-xl ${
+                                  betLogData.is_back_bookmaker === 1
+                                    ? "text-red-400"
+                                    : "text-green-400"
+                                }`}
+                              >
                                 {betLogData.is_back_bookmaker === 1 ? "-" : "+"}
                                 ₹{betLogData.potential_invest_bookmaker}
                               </span>
@@ -1608,7 +1620,13 @@ export default function LiveMatch() {
                               </>
                             ) : (
                               // For the other team, show the investment amount with opposite sign
-                              <span className="text-xs text-gray-400">
+                              <span
+                                className={`text-xs ${
+                                  betLogData.is_back_bookmaker === 1
+                                    ? "text-red-400"
+                                    : "text-green-400"
+                                }`}
+                              >
                                 {betLogData.is_back_bookmaker === 1 ? "-" : "+"}
                                 ₹{betLogData.potential_invest_bookmaker}
                               </span>
