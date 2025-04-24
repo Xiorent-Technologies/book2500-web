@@ -1122,9 +1122,7 @@ export default function LiveMatch() {
       if (pendingBets.length === 0) {
         toast.dismiss();
         toast.error(
-          `No pending ${
-            cashoutType === "match-odds" ? "match odds" : "bookmaker"
-          } bets found for cashout`
+          `No pending bets found for cashout`
         );
         return;
       }
