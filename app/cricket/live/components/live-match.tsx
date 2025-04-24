@@ -1792,35 +1792,29 @@ export default function LiveMatch() {
                       key={bookmakerMarket.runners[0].selectionId}
                       className="border-b border-purple-900"
                     >
+                      {/* Bookmaker section */}
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[0].runnerName}</span>
                         {betMaps[bookmakerMarket.runners[0].selectionId] && (
-                          <div className="space-y-1 flex flex-col items-end mr-4">
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-gray-300">
-                                {bookmakerMarket.runners[0].runnerName}
-                              </span>
-                              <span
-                                className={`font-medium ${
-                                  betMaps[
-                                    bookmakerMarket.runners[0].selectionId
-                                  ].amount > 0
-                                    ? "text-green-400"
-                                    : "text-red-400"
-                                }`}
-                              >
-                                {betMaps[bookmakerMarket.runners[0].selectionId]
+                          <div className="mr-4">
+                            <span
+                              className={`font-medium ${
+                                betMaps[bookmakerMarket.runners[0].selectionId]
                                   .amount > 0
-                                  ? "+"
-                                  : ""}
-                                ₹
-                                {Math.abs(
-                                  betMaps[
-                                    bookmakerMarket.runners[0].selectionId
-                                  ].amount
-                                ).toFixed(2)}
-                              </span>
-                            </div>
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {betMaps[bookmakerMarket.runners[0].selectionId]
+                                .amount > 0
+                                ? "+"
+                                : ""}
+                              ₹
+                              {Math.abs(
+                                betMaps[bookmakerMarket.runners[0].selectionId]
+                                  .amount
+                              ).toFixed(2)}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1905,35 +1899,29 @@ export default function LiveMatch() {
                       key={bookmakerMarket.runners[1].selectionId}
                       className="border-b border-purple-900"
                     >
+                      {/* Bookmaker section */}
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[1].runnerName}</span>
                         {betMaps[bookmakerMarket.runners[1].selectionId] && (
-                          <div className="space-y-1 flex flex-col items-end mr-4">
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-gray-300">
-                                {bookmakerMarket.runners[1].runnerName}
-                              </span>
-                              <span
-                                className={`font-medium ${
-                                  betMaps[
-                                    bookmakerMarket.runners[1].selectionId
-                                  ].amount > 0
-                                    ? "text-green-400"
-                                    : "text-red-400"
-                                }`}
-                              >
-                                {betMaps[bookmakerMarket.runners[1].selectionId]
+                          <div className="mr-4">
+                            <span
+                              className={`font-medium ${
+                                betMaps[bookmakerMarket.runners[1].selectionId]
                                   .amount > 0
-                                  ? "+"
-                                  : ""}
-                                ₹
-                                {Math.abs(
-                                  betMaps[
-                                    bookmakerMarket.runners[1].selectionId
-                                  ].amount
-                                ).toFixed(2)}
-                              </span>
-                            </div>
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {betMaps[bookmakerMarket.runners[1].selectionId]
+                                .amount > 0
+                                ? "+"
+                                : ""}
+                              ₹
+                              {Math.abs(
+                                betMaps[bookmakerMarket.runners[1].selectionId]
+                                  .amount
+                              ).toFixed(2)}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -2309,7 +2297,8 @@ export default function LiveMatch() {
                         setSelectedBet(null);
                         handleClearStake();
                       }}
-                      className="text-gray-400 hover:text-white p-2"
+                      className="text-gray```tsx
+                      .400 hover:text-white p-2"
                     >
                       ✕
                     </button>
