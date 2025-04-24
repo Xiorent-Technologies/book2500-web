@@ -23,7 +23,7 @@ export default function PredictionPage() {
     const fetchPredictions = async () => {
         try {
             const token = localStorage.getItem('auth_token')
-            const response = await fetch('https://test.book2500.in/prediction', {
+            const response = await fetch('https://book2500.funzip.in/api/prediction', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 }
