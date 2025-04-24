@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
@@ -668,7 +669,7 @@ export default function LiveMatch() {
   useEffect(() => {
     const interval = setInterval(updateFancyOdds, 1500);
     return () => clearInterval(interval);
-  }, [eventId, marketId, updateFancyOdds]);
+  }, [eventId, marketId]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
@@ -775,7 +776,7 @@ export default function LiveMatch() {
   // Initial fetch on mount
   useEffect(() => {
     fetchBetLog();
-  }, [fetchBetLog]); // Add fetchBetLog to dependencies
+  }, []); // Only run once on mount
 
   const handlePlaceBet = async () => {
     if (!isBrowser || !selectedBet) return;
@@ -843,7 +844,7 @@ export default function LiveMatch() {
         level: 1,
       };
 
-      console.log("Prediction request:", requestBody); // For debugging
+      console.log("Prediction request:", requestBody); // For debugginging
 
       const response = await fetch(
         "https://book2500.funzip.in/api/prediction",
@@ -959,6 +960,10 @@ export default function LiveMatch() {
           return;
         }
 
+        // Update stake based on whether it's the same selection or different
+        const isNewSelection =
+          !selectedBet || selectedBet.selectionId !== runner.selectionId;
+
         setSelectedBet({
           name: runner.runner,
           type: type.toUpperCase(),
@@ -970,7 +975,20 @@ export default function LiveMatch() {
         });
 
         setSelectedOdds(oddsValue);
-        setSelectedStake(MIN_STAKE.toString());
+
+        // If it's a different selection and there's already a stake, calculate new stake
+        if (isNewSelection && selectedStake) {
+          const currentStake = Number(selectedStake);
+          const currentOdds = Number(selectedOdds);
+          if (!isNaN(currentStake) && !isNaN(currentOdds)) {
+            const liability = currentStake * currentOdds;
+            const newStake = Math.floor(liability / Number(oddsValue));
+            setSelectedStake(newStake.toString());
+          }
+        } else if (!selectedStake) {
+          // If no stake is set, use minimum stake
+          setSelectedStake(MIN_STAKE.toString());
+        }
 
         if (isMobile) {
           setShowMobileBetForm(true);
@@ -1104,7 +1122,6 @@ export default function LiveMatch() {
       });
 
       const data = await response.json();
-      // Find the latest pending bet for the current match
       const pendingBets =
         data.logs?.filter((log: any) => log.status === "0") || [];
 
@@ -1114,20 +1131,25 @@ export default function LiveMatch() {
         return;
       }
 
-      // Get the most recent bet
       const latestBet = pendingBets[0];
 
-      // Prepare cashout data with base0 and base1
+      // Get the index of the odds for the selected team and its opposite
+      let base0 = "",
+        base1 = "";
+
+      if (cashoutType === "match-odds") {
+        base0 = betLogData?.base0_matchodds || "0";
+        base1 = betLogData?.base1_matchodds || "1";
+      } else {
+        base0 = betLogData?.base0_bookmaker || "0";
+        base1 = betLogData?.base1_bookmaker || "1";
+      }
+
+      // Prepare cashout data with base0 and base1 indices
       const cashoutData = {
         bet_invest_id: latestBet.id,
-        base0:
-          cashoutType === "match-odds"
-            ? betLogData?.base0_matchodds
-            : betLogData?.base0_bookmaker,
-        base1:
-          cashoutType === "match-odds"
-            ? betLogData?.base1_matchodds
-            : betLogData?.base1_bookmaker,
+        base0: base0,
+        base1: base1,
       };
 
       const result = await executeCashout(cashoutData);
