@@ -6,7 +6,12 @@ interface LiveMatchData {
 
 async function fetchLiveMatchData(matchId: string) {
   try {
-    const response = await fetch("https://tvapp.1ten.live/api/get-all-tv", {
+    const response = await fetch(`https://app.livetvapi.com/api/get-all-tv`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ matchId }),
       cache: "no-store",
       next: { revalidate: 0 },
     });

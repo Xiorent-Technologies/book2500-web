@@ -11,8 +11,11 @@ export function VideoStream({ tvUrl }: VideoStreamProps) {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin === "https://tvapp.1ten.live" && event.data) {
-        // console.log("Message from stream:", event.data)
+      if (
+        event.origin === "https://app.livetvapi.com/api/get-all-tv" &&
+        event.data
+      ) {
+        console.log("Message from stream:", event.data);
       }
     };
 

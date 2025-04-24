@@ -689,7 +689,7 @@ export default function LiveMatch() {
 
       const data = await response.json();
       if (data?.data) {
-        console.log(data.data);
+        // console.log(data.data);
         setBookmakerMappings(data.data);
       }
     } catch (error) {
@@ -712,7 +712,7 @@ export default function LiveMatch() {
 
       if (data?.data) {
         setBookmakerMarket(data.data);
-        console.log(data.data);
+        // console.log(data.data);
       }
     } catch (error) {
       console.error("Error fetching bookmaker odds:", error);
@@ -844,7 +844,7 @@ export default function LiveMatch() {
         level: 1,
       };
 
-      console.log("Prediction request:", requestBody); // For debugginging
+      // console.log("Prediction request:", requestBody); // For debugginging
 
       const response = await fetch(
         "https://book2500.funzip.in/api/prediction",
@@ -923,7 +923,8 @@ export default function LiveMatch() {
   const handleOddsClick = (
     runner: Runner | BookmakerRunner | FancyOdds,
     type: "back" | "lay" | "no" | "yes",
-    section: "match" | "bookmaker" | "fancy"
+    section: "match" | "bookmaker" | "fancy",
+    index: number = 0 // Add index parameter
   ) => {
     setBetError(null);
 
@@ -936,8 +937,8 @@ export default function LiveMatch() {
         if (!runner.ex) return;
         const odds =
           type === "back"
-            ? runner.ex.availableToBack?.[0]
-            : runner.ex.availableToLay?.[0];
+            ? runner.ex.availableToBack?.[index] // Use index parameter
+            : runner.ex.availableToLay?.[index]; // Use index parameter
 
         // Check if odds are suspended
         isSuspended =
@@ -960,10 +961,6 @@ export default function LiveMatch() {
           return;
         }
 
-        // Update stake based on whether it's the same selection or different
-        const isNewSelection =
-          !selectedBet || selectedBet.selectionId !== runner.selectionId;
-
         setSelectedBet({
           name: runner.runner,
           type: type.toUpperCase(),
@@ -975,20 +972,7 @@ export default function LiveMatch() {
         });
 
         setSelectedOdds(oddsValue);
-
-        // If it's a different selection and there's already a stake, calculate new stake
-        if (isNewSelection && selectedStake) {
-          const currentStake = Number(selectedStake);
-          const currentOdds = Number(selectedOdds);
-          if (!isNaN(currentStake) && !isNaN(currentOdds)) {
-            const liability = currentStake * currentOdds;
-            const newStake = Math.floor(liability / Number(oddsValue));
-            setSelectedStake(newStake.toString());
-          }
-        } else if (!selectedStake) {
-          // If no stake is set, use minimum stake
-          setSelectedStake(MIN_STAKE.toString());
-        }
+        setSelectedStake(MIN_STAKE.toString());
 
         if (isMobile) {
           setShowMobileBetForm(true);
@@ -1027,14 +1011,15 @@ export default function LiveMatch() {
 
   const handleBookmakerBet = (
     runner: BookmakerRunner,
-    type: "back" | "lay"
+    type: "back" | "lay",
+    index: number = 0 // Add index parameter
   ) => {
     if (runner.status === "SUSPENDED") return;
 
     const odds =
       type === "back"
-        ? runner.back?.[0]?.price // Changed from ex.availableToBack[0].price
-        : runner.lay?.[0]?.price; // Changed from ex.availableToLay[0].price
+        ? runner.back?.[index]?.price // Use index parameter
+        : runner.lay?.[index]?.price; // Use index parameter
 
     if (!odds) return;
 
@@ -1371,9 +1356,10 @@ export default function LiveMatch() {
                             return (
                               <div
                                 key={`back-${i}`}
-                                onClick={() =>
-                                  isAvailable &&
-                                  handleOddsClick(runner, "back", "match")
+                                onClick={
+                                  () =>
+                                    isAvailable &&
+                                    handleOddsClick(runner, "back", "match", i) // Pass index i
                                 }
                                 className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${
                                   isAvailable ? "cursor-pointer" : "opacity-90"
@@ -1405,9 +1391,10 @@ export default function LiveMatch() {
                             return (
                               <div
                                 key={`lay-${i}`}
-                                onClick={() =>
-                                  isAvailable &&
-                                  handleOddsClick(runner, "lay", "match")
+                                onClick={
+                                  () =>
+                                    isAvailable &&
+                                    handleOddsClick(runner, "lay", "match", i) // Pass index i
                                 }
                                 className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${
                                   isAvailable ? "cursor-pointer" : "opacity-90"
@@ -1545,7 +1532,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[0].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[0],
-                                "back"
+                                "back",
+                                i // Pass index i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
@@ -1570,7 +1558,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[0].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[0],
-                                "lay"
+                                "lay",
+                                i // Pass index i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
@@ -1672,7 +1661,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[1].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[1],
-                                "back"
+                                "back",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#72bbee] cursor-pointer"
@@ -1697,7 +1687,8 @@ export default function LiveMatch() {
                               bookmakerMarket.runners[1].status === "ACTIVE" &&
                               handleBookmakerBet(
                                 bookmakerMarket.runners[1],
-                                "lay"
+                                "lay",
+                                i
                               )
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
