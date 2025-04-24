@@ -228,7 +228,8 @@ function CashoutDialog({
   potentialReturn,
   isBack,
 }: CashoutDialogProps) {
-  const totalAmount = Number(potentialInvest) + Number(potentialReturn);
+  // Calculate 90% of the potential return
+  const cashoutAmount = Math.abs(Number(potentialReturn)) * 0.9;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -240,31 +241,16 @@ function CashoutDialog({
           <DialogDescription className="text-gray-300">
             <div className="space-y-2">
               <p>Do you want to proceed with the cashout?</p>
-              {potentialInvest && potentialReturn && (
-                <div className="mt-4 p-3 bg-[#3a2255] rounded-lg space-y-2">
+              {potentialReturn && (
+                <div className="mt-4 p-3 bg-[#3a2255] rounded-lg">
                   <div className="flex justify-between items-center">
-                    <span>Investment</span>
-                    <span>₹{potentialInvest}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Potential {isBack === 1 ? "Profit" : "Loss"}</span>
+                    <span>Cashout Amount</span>
                     <span
                       className={
                         isBack === 1 ? "text-green-400" : "text-red-400"
                       }
                     >
-                      {isBack === 1 ? "+" : "-"}₹
-                      {Math.abs(Number(potentialReturn))}
-                    </span>
-                  </div>
-                  <div className="pt-2 mt-2 border-t border-purple-800 flex justify-between items-center">
-                    <span>Total {isBack === 1 ? "Profit" : "Loss"}</span>
-                    <span
-                      className={
-                        isBack === 1 ? "text-green-400" : "text-red-400"
-                      }
-                    >
-                      {isBack === 1 ? "+" : "-"}₹{Math.abs(totalAmount)}
+                      {isBack === 1 ? "+" : "-"}₹{cashoutAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -411,16 +397,31 @@ export default function LiveMatch() {
       if (!eventId) return;
 
       try {
+        // First fetch the score and TV data mapping
         const response = await fetch("https://tvapp.1ten.live/api/get-all-tv", {
           cache: "no-store",
         });
         const data: LiveMatchData[] = await response.json();
         const matchData = data.find((match) => match.eventId === eventId);
-        setLiveMatchData(matchData || null);
 
-        setIsMatchLive(!!matchData?.tv);
+        if (matchData) {
+          // Update the TV URL to use the new API endpoint
+          const tvUrl = `https://app.livetvapi.com/event-play-2/${eventId}`;
+          setLiveMatchData({
+            ...matchData,
+            tv: tvUrl,
+            // Use the matched iframeScoreV1 from the API response
+            iframeScoreV1: matchData.iframeScoreV1,
+          });
+          setIsMatchLive(true);
+        } else {
+          setLiveMatchData(null);
+          setIsMatchLive(false);
+        }
       } catch (error) {
         console.error("Error fetching live match data:", error);
+        setLiveMatchData(null);
+        setIsMatchLive(false);
       }
     };
 
@@ -1228,7 +1229,7 @@ export default function LiveMatch() {
             </div>
 
             <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
-              {liveMatchData?.iframeScore && (
+              {liveMatchData?.iframeScoreV1 && (
                 <iframe
                   src={liveMatchData.iframeScoreV1}
                   className="w-full h-full border-0"

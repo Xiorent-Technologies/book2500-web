@@ -6,17 +6,24 @@ interface LiveMatchData {
 
 async function fetchLiveMatchData(matchId: string) {
   try {
-    const response = await fetch(`https://app.livetvapi.com/api/get-all-tv`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ matchId }),
+    // First fetch score data from tvapp API
+    const response = await fetch("https://tvapp.1ten.live/api/get-all-tv", {
       cache: "no-store",
       next: { revalidate: 0 },
     });
     const data: LiveMatchData[] = await response.json();
-    return data.find((match) => match.eventId === matchId);
+    const matchData = data.find((match) => match.eventId === matchId);
+
+    if (matchData) {
+      // Update TV URL to use livetvapi
+      return {
+        ...matchData,
+        tv: `https://app.livetvapi.com/event-play-2/${matchId}`,
+        // Keep the iframeScoreV1 from the API response
+        iframeScoreV1: matchData.iframeScoreV1,
+      };
+    }
+    return null;
   } catch (error) {
     console.error("Error fetching match data:", error);
     return null;
