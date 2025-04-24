@@ -1112,10 +1112,10 @@ export default function LiveMatch() {
       // Filter bets based on cashout type
       const pendingBets =
         data.logs?.filter((log: any) => {
-          if (cashoutType === "match-odds") {
-            return log.status === "0" && log.market_type === "MATCH";
+          if (potential_invest_matchodds != null) {
+            return log.status === "1";
           } else {
-            return log.status === "0" && log.market_type === "BOOKMAKER";
+            return log.status === "0";
           }
         }) || [];
 
@@ -1143,7 +1143,7 @@ export default function LiveMatch() {
       const cashoutData = {
         bet_invest_id: latestBet.id,
         base0: base0 || "0",
-        base1: base1 || "1",
+        base1: base1 || "0",
       };
 
       const result = await executeCashout(cashoutData);
