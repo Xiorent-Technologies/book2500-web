@@ -91,8 +91,8 @@ interface FancyOddsApiResponse {
 
 interface CashoutData {
   bet_invest_id: string;
-  base0: string; // on which we are betting ratio
-  base1: string; // is the opposite of the placed bet ratio
+  base0: string; // Index of the back/lay on which user is betting
+  base1: string; // Corresponding opposite index
 }
 
 interface CashoutResponse {
@@ -239,9 +239,7 @@ export async function createPrediction(
   }
 }
 
-export async function executeCashout(
-  data: CashoutData,
-): Promise<CashoutResponse> {
+export async function executeCashout(data: CashoutData): Promise<CashoutResponse> {
   const token = localStorage.getItem("auth_token");
   if (!token) {
     return {
@@ -282,5 +280,25 @@ export async function executeCashout(
       success: false,
       message: "An error occurred while processing your cashout",
     };
+  }
+}
+
+export async function fetchBetLog(): Promise<any> {
+  const token = localStorage.getItem("auth_token");
+  if (!token) throw new Error("Not authenticated");
+
+  try {
+    const response = await fetch("https://book2500.funzip.in/api/bet-log", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch bet log");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching bet log:", error);
+    throw error;
   }
 }
