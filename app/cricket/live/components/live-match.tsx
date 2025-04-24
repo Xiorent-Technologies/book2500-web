@@ -228,29 +228,29 @@ function CashoutDialog({
   potentialReturn,
   isBack,
 }: CashoutDialogProps) {
-  // Calculate 90% of the potential return
-  const cashoutAmount = Math.abs(Number(potentialReturn)) * 0.9;
+  // Get the appropriate amounts based on the cashout type
+  const amount =
+    Math.abs(Number(isBack === 1 ? potentialReturn : potentialInvest)) * 0.9;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-[#2D1A4A] border border-purple-900">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
-            Confirm Cashout
+            Confirm {type === "match-odds" ? "Match Odds" : "Bookmaker"} Cashout
           </DialogTitle>
           <DialogDescription className="text-gray-300">
             <div className="space-y-2">
-              <p>Do you want to proceed with the cashout?</p>
+              <p>
+                Do you want to proceed with the{" "}
+                {type === "match-odds" ? "match odds" : "bookmaker"} cashout?
+              </p>
               {potentialReturn && (
                 <div className="mt-4 p-3 bg-[#3a2255] rounded-lg">
                   <div className="flex justify-between items-center">
                     <span>Cashout Amount</span>
-                    <span
-                      className={
-                        isBack === 1 ? "text-green-400" : "text-red-400"
-                      }
-                    >
-                      {isBack === 1 ? "+" : "-"}₹{cashoutAmount.toFixed(2)}
+                    <span className="text-green-400">
+                      +₹{amount.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -267,7 +267,7 @@ function CashoutDialog({
             Cancel
           </Button>
           <Button
-            onClick={onConfirm}
+            onClick={() => onConfirm()}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             Confirm Cashout
@@ -1108,34 +1108,42 @@ export default function LiveMatch() {
       });
 
       const data = await response.json();
+
+      // Filter bets based on cashout type
       const pendingBets =
-        data.logs?.filter((log: any) => log.status === "0") || [];
+        data.logs?.filter((log: any) => {
+          if (cashoutType === "match-odds") {
+            return log.status === "0" && log.market_type === "MATCH";
+          } else {
+            return log.status === "0" && log.market_type === "BOOKMAKER";
+          }
+        }) || [];
 
       if (pendingBets.length === 0) {
         toast.dismiss();
-        toast.error("No pending bets found for cashout");
+        toast.error(
+          `No pending ${
+            cashoutType === "match-odds" ? "match odds" : "bookmaker"
+          } bets found for cashout`
+        );
         return;
       }
 
       const latestBet = pendingBets[0];
 
-      // Get the index of the odds for the selected team and its opposite
-      let base0 = "",
-        base1 = "";
+      const base0 =
+        cashoutType === "match-odds"
+          ? betLogData?.base0_matchodds
+          : betLogData?.base0_bookmaker;
+      const base1 =
+        cashoutType === "match-odds"
+          ? betLogData?.base1_matchodds
+          : betLogData?.base1_bookmaker;
 
-      if (cashoutType === "match-odds") {
-        base0 = betLogData?.base0_matchodds || "0";
-        base1 = betLogData?.base1_matchodds || "1";
-      } else {
-        base0 = betLogData?.base0_bookmaker || "0";
-        base1 = betLogData?.base1_bookmaker || "1";
-      }
-
-      // Prepare cashout data with base0 and base1 indices
       const cashoutData = {
         bet_invest_id: latestBet.id,
-        base0: base0,
-        base1: base1,
+        base0: base0 || "0",
+        base1: base1 || "1",
       };
 
       const result = await executeCashout(cashoutData);
