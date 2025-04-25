@@ -280,6 +280,8 @@ export default function LiveMatch() {
   const eventId = searchParams.get("match");
   const marketId = searchParams.get("market");
 
+
+
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
   const [selectedOdds, setSelectedOdds] = useState("");
   const [selectedStake, setSelectedStake] = useState("");
@@ -1075,118 +1077,125 @@ export default function LiveMatch() {
     };
   }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
+const processCashout = async () => {
+  setShowCashoutDialog(false);
+  toast.loading("Processing cashout...");
 
-  const processCashout = async () => {
-    setShowCashoutDialog(false);
-    toast.loading("Processing cashout...");
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const matchId = urlParams.get("match");
+    const marketId = urlParams.get("market");
+    const token = localStorage.getItem("auth_token");
 
-    try {
-        const currentUrl = window.location.href;
-        const urlParams = new URLSearchParams(new URL(currentUrl).search);
-        const matchId = urlParams.get("match");
-        const marketId = urlParams.get("market");
-        const token = localStorage.getItem("auth_token");
+    if (!matchId || !marketId || !token) {
+      toast.dismiss();
+      toast.error("Missing match, market, or auth token");
+      return;
+    }
 
-        // Fetch bet log and odds data in parallel
-        console.time("API Fetch");
-        const [betRes, oddsRes] = await Promise.all([
-            fetch("https://book2500.funzip.in/api/bet-log", {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            }),
-            fetch(`https://test.book2500.in/fetch-event-odds/${matchId}/${marketId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            }),
-        ]);
-        console.timeEnd("API Fetch");
+    const [betRes, oddsRes] = await Promise.all([
+      fetch("https://book2500.funzip.in/api/bet-log", {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`https://test.book2500.in/fetch-event-odds/${matchId}/${marketId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
 
-        if (!betRes.ok || !oddsRes.ok) {
-            throw new Error("Failed to fetch data");
-        }
+    if (!betRes.ok || !oddsRes.ok) {
+      throw new Error("Failed to fetch bet logs or odds");
+    }
+
+    const betData = await betRes.json();
+    const oddsData = (await oddsRes.json())?.data;
+
+    const matchKey = cashoutType === "match-odds" ? "matchid_matchodds" : "matchid_bookmaker";
+    const matchKeyValue = betData[matchKey]?.toString();
+
+    const pendingBets = (betData.logs || []).filter(log =>
+      log.match_id === matchKeyValue &&
+      log.is_cashed_out === 0 &&
+      log.status === "0"
+    );
+
+    if (pendingBets.length === 0) {
+      toast.dismiss();
+      toast.error("No pending bets found for cashout");
+      return;
+    }
+
+    const latestBet = pendingBets[0];
+    const selectionId = latestBet.selection_id?.toString();
+    const level = latestBet.level?.toString() || "0";
+    const isBack = latestBet.is_back === 1;
+
+    const runners = oddsData?.runners;
+    if (!runners || runners.length < 2) {
+      toast.dismiss();
+      toast.error("Runner data is incomplete or missing");
+      return;
+    }
+
+    const selectedRunner = runners.find(r => r.selectionId?.toString() === selectionId);
+    const oppositeRunner = runners.find(r => r.selectionId?.toString() !== selectionId);
+
+    if (!selectedRunner || !oppositeRunner) {
+      toast.dismiss();
+      toast.error("Could not find selected or opposite runner");
+      return;
+    }
+
+    const selPrices = isBack ? selectedRunner.back : selectedRunner.lay;
+    const oppPrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
+
+    const selPrice = selPrices.find(p => p.level?.toString() === level);
+    const oppPrice = oppPrices.find(p => p.level?.toString() === level);
+
+    const base0 = selPrice?.price ? parseFloat(selPrice.price) : 1.5;
+    const base1 = oppPrice?.price ? parseFloat(oppPrice.price) : 91;
+
+    const cashoutData = {
+      bet_invest_id: latestBet.id,
+      base0: base0.toString(),
+      base1: base1.toString(),
+    };
+
+    const result = await executeCashout(cashoutData);
+    toast.dismiss();
+
+    if (result.success) {
+      const pollingInterval = setInterval(async () => {
+        const betRes = await fetch("https://book2500.funzip.in/api/bet-log", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         const betData = await betRes.json();
-        const oddsData = (await oddsRes.json())?.data;
+        const updatedBet = betData.logs.find(log => log.id === latestBet.id);
 
-        const matchid = cashoutType === "match-odds"
-            ? betData.matchid_matchodds?.toString()
-            : betData.matchid_bookmaker?.toString();
+        if (updatedBet?.is_cashed_out === 1) {
+          clearInterval(pollingInterval);
+          toast.success("Cashout successful", {
+            description: `Refund: ₹${result.refund_amount.toFixed(2)}`,
+          });
 
-        const pendingBets = betData.logs?.filter(log =>
-            log.match_id === matchid &&
-            log.is_cashed_out === 0 &&
-            log.status === "0"
-        ) || [];
+          // ✅ Update local state to reflect latest data
+          setBetLogData(updatedBet);
 
-        if (pendingBets.length === 0) {
-            toast.dismiss();
-            toast.error(`No pending bets found for cashout`);
-            return;
+          updateBalanceFromAPI();
         }
-
-        const latestBet = pendingBets[0];
-        const selectionId = latestBet.selection_id?.toString();
-        const level = latestBet.level?.toString() || "0";
-        const isBack = latestBet.is_back === 1;
-
-        const selectedRunner = oddsData?.runners?.find(r => r.selectionId?.toString() === selectionId);
-        const oppositeRunner = oddsData?.runners?.find(r => r.selectionId?.toString() !== selectionId);
-
-        if (!selectedRunner || !oppositeRunner) {
-            toast.dismiss();
-            toast.error("Unable to find selection or opposite runner");
-            return;
-        }
-
-        const selectedPrices = isBack ? selectedRunner.back : selectedRunner.lay;
-        const oppositePrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
-
-        const selectedPrice = selectedPrices?.find(p => p.level?.toString() === level);
-        const oppositePrice = oppositePrices?.find(p => p.level?.toString() === level);
-
-        const base0 = selectedPrice?.price ? parseFloat(selectedPrice.price) : 1.5;
-        const base1 = oppositePrice?.price ? parseFloat(oppositePrice.price) : 2.0;
-
-        const cashoutData = {
-            bet_invest_id: latestBet.id,
-            base0: base0.toString(),
-            base1: base1.toString()
-        };
-
-        console.time("Execute Cashout");
-        const result = await executeCashout(cashoutData);
-        console.timeEnd("Execute Cashout");
-
-        toast.dismiss();
-
-        if (result.success) {
-            if (result.message === "Cash out condition not met") {
-                toast.error("Cash out not available", {
-                    description: "This bet doesn't currently meet cashout conditions",
-                });
-            } else {
-                toast.success(result.message, {
-                    description: result.refund_amount
-                        ? `Refund Amount: ₹${result.refund_amount.toFixed(2)}\nNew Balance: ₹${result.new_balance?.toFixed(2)}`
-                        : undefined,
-                });
-                updateBalanceFromAPI();
-            }
-        } else {
-            toast.error("Cashout failed", {
-                description: result.message,
-            });
-        }
-    } catch (error) {
-        console.error("Cashout error:", error);
-        toast.dismiss();
-        toast.error("Failed to process cashout");
+      }, 3000);
+    } else {
+      toast.error("Cashout failed", { description: result.message });
     }
+
+  } catch (error) {
+    console.error("Cashout error:", error);
+    toast.dismiss();
+    toast.error("Cashout process encountered an error");
+  }
 };
+
+  
   
   const handleCashoutClick = useCallback(
     (e: React.MouseEvent, type: string) => {

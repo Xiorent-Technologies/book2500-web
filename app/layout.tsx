@@ -1,12 +1,11 @@
+// app/layout.tsx
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import "./styles.css"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
-import { Toaster } from "sonner"
-
-
+import ClientToaster from "./ClientToaster"
 
 export const metadata: Metadata = {
   title: "Betting Platform",
@@ -20,11 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body suppressHydrationWarning={true}>
         <Header />
         {children}
         <Footer />
-        <Toaster richColors expand={true} position="top-center" />
+        <ClientToaster />
       </body>
     </html>
   )
