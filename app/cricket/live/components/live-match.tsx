@@ -618,13 +618,26 @@ export default function LiveMatch() {
       }
     };
 
-    fetchInitialFancyOdds();
-    const interval = setInterval(fetchInitialFancyOdds, 1500);
-    return () => clearInterval(interval);
-  }, [eventId, marketId]);
+  //   fetchInitialFancyOdds();
+  //   const interval = setInterval(fetchInitialFancyOdds, 1500);
+  //   return () => clearInterval(interval);
+  // }, [eventId, marketId]);
 
-  const updateFancyOdds = async () => {
-    if (!eventId || !marketId) return;
+  useEffect(() => {
+    const updateFancyOdds = async () => {
+      if (!eventId || !marketId) return;
+      // Your logic to update the fancy odds
+    };
+  
+    // Call the function initially
+    updateFancyOdds();
+  
+    // Set the interval to update fancy odds every 1500ms
+    const interval = setInterval(updateFancyOdds, 1500);
+  
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, [eventId, marketId]); 
 
     try {
       const response = await fetch(
@@ -1251,6 +1264,7 @@ export default function LiveMatch() {
         base0 = betLogData?.base0_matchodds || "";
         base1 = betLogData?.base1_matchodds || "";
       } else if (type === "bookmaker-odds") {
+     
         potentialInvest = betLogData?.potential_invest_bookmaker || "";
         potentialReturn = betLogData?.potential_return_bookmaker || "";
         isBack = betLogData?.is_back_bookmaker || 0;
