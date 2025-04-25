@@ -1075,20 +1075,6 @@ export default function LiveMatch() {
     };
   }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
-  // const getFancyOddsMapping = useCallback(
-  //   (selectionId: string | number) => {
-  //     return fancyOddsMappings.find(
-  //       (mapping) => mapping.SelectionId === String(selectionId)
-  //     );
-  //   },
-  //   [fancyOddsMappings]
-  // );
-
-  // const handleCashout = async (type: string, selectionId?: string) => {
-  //   setCashoutType(type);
-  //   if (selectionId) setCashoutSelectionId(selectionId);
-  //   setShowCashoutDialog(true);
-  // };
 
   const processCashout = async () => {
     setShowCashoutDialog(false);
