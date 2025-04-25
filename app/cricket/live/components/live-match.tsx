@@ -322,8 +322,14 @@ export default function LiveMatch() {
   //   []
   // );
   // const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
-  const [betLogData, setBetLogData] = useState<any>(null);
-
+  interface BetLogData {
+    id: string;
+    amount: number;
+    timestamp: string;
+    // Add other properties that you expect
+  }
+  
+  const [betLogData, setBetLogData] = useState<BetLogData | null>(null);
   // const handleFancyOddsUpdate = useCallback(
   //   (realtimeOdds: RealTimeFancyOdds[]) => {
   //     setFancyOdds((prevOdds) => {
