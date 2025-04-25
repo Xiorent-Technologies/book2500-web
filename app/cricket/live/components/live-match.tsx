@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 "use client";
-
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -304,11 +303,19 @@ export default function LiveMatch() {
     fancy: true,
   });
   const [isMatchLive, setIsMatchLive] = useState(false);
-  const [fancyOddsMappings, setFancyOddsMappings] = useState<any>([]);
+  interface FancyOddsMapping {
+    id: number;
+    name: string;
+    odds: number;
+    description?: string;  // Optional property
+  }
+  
+  const [fancyOddsMappings, setFancyOddsMappings] = useState<FancyOddsMapping[]>([]);
   // const [fancyApiData, setFancyApiData] = useState<FancyOddApiData[]>([]);
   // const [initialOdds, setInitialOdds] = useState<EventOddsResponse["data"]>([]);
   const [matchApiData, setMatchApiData] = useState<EventOddApiData[]>([]);
-  const [showCashoutDialog, setShowCashoutDialog] = useState(false);
+  const [showCashoutDialog, setShowCashoutDialog] = useState<boolean>(false);
+
   const [cashoutType, setCashoutType] = useState<string>("");
   // const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
   // const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
@@ -617,6 +624,11 @@ export default function LiveMatch() {
       const response = await fetch(
         `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
       );
+
+      interface RealtimeOdd {
+        RunnerName: string;
+      }
+        // Y
       const responseData = await response.json();
 
       if (responseData?.data) {
@@ -625,7 +637,7 @@ export default function LiveMatch() {
           return prevOdds.map((odd) => {
             // Find matching runner by RunnerName
             const realtimeOdd = responseData.data.find(
-              (r: any) => r.RunnerName === odd.RunnerName
+              (r: { RunnerName: string }) => r.RunnerName === odd.RunnerName
             );
 
             if (realtimeOdd) {
