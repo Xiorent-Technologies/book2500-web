@@ -679,7 +679,7 @@ export default function LiveMatch() {
   useEffect(() => {
     const interval = setInterval(updateFancyOdds, 1500);
     return () => clearInterval(interval);
-  }, [eventId, marketId]);
+  }, [eventId, marketId,updateFancyOdds]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
@@ -786,8 +786,8 @@ export default function LiveMatch() {
   // Initial fetch on mount
   useEffect(() => {
     fetchBetLog();
-  }, []); // Only run once on mount
-
+  }, [fetchBetLog]); // Add fetchBetLog to the dependencies
+  
   const handlePlaceBet = async () => {
     if (!isBrowser || !selectedBet) return;
 
@@ -926,9 +926,16 @@ export default function LiveMatch() {
   };
 
   // Add this helper function to check runner types
+  interface Runner {
+    runner: string;
+    ex: string;
+    // Add any other properties that are part of the Runner type
+  }
+  
   const isMatchRunner = (runner: any): runner is Runner => {
-    return runner && "runner" in runner && "ex" in runner;
+    return typeof runner === 'object' && runner !== null && 'runner' in runner && 'ex' in runner;
   };
+  
 
   const handleOddsClick = (
     runner: Runner | BookmakerRunner | FancyOdds,
@@ -1244,7 +1251,6 @@ export default function LiveMatch() {
         base0 = betLogData?.base0_matchodds || "";
         base1 = betLogData?.base1_matchodds || "";
       } else if (type === "bookmaker-odds") {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         potentialInvest = betLogData?.potential_invest_bookmaker || "";
         potentialReturn = betLogData?.potential_return_bookmaker || "";
         isBack = betLogData?.is_back_bookmaker || 0;
