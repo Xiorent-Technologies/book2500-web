@@ -1,4 +1,4 @@
-
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 "use client";
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { updateBalanceFromAPI } from "@/lib/utils";
-import { executeCashout } from "@/lib/api";
+import { executeCashout, PredictionData } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { EventOdd } from "@/lib/types/odds";
 
 const MIN_STAKE = 100;
 const MAX_STAKE = 250000;
@@ -280,8 +279,6 @@ export default function LiveMatch() {
   const eventId = searchParams.get("match");
   const marketId = searchParams.get("market");
 
-
-
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
   const [selectedOdds, setSelectedOdds] = useState("");
   const [selectedStake, setSelectedStake] = useState("");
@@ -307,50 +304,46 @@ export default function LiveMatch() {
     fancy: true,
   });
   const [isMatchLive, setIsMatchLive] = useState(false);
-  const [fancyOddsMappings, setFancyOddsMappings] = useState<GroupedFancyOdd[]>(
-    []
-  );
-  const [fancyApiData, setFancyApiData] = useState<FancyOddApiData[]>([]);
-  const [initialOdds, setInitialOdds] = useState<EventOddsResponse["data"]>([]);
+  const [fancyOddsMappings, setFancyOddsMappings] = useState<any>([]);
+  // const [fancyApiData, setFancyApiData] = useState<FancyOddApiData[]>([]);
+  // const [initialOdds, setInitialOdds] = useState<EventOddsResponse["data"]>([]);
   const [matchApiData, setMatchApiData] = useState<EventOddApiData[]>([]);
   const [showCashoutDialog, setShowCashoutDialog] = useState(false);
   const [cashoutType, setCashoutType] = useState<string>("");
-  const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
-  const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
-    []
-  );
-  const [bookmakerMappings, setBookmakerMappings] = useState<
-    BookmakerMapping[]
-  >([]);
+  // const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
+  // const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
+  //   []
+  // );
+  // const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [betLogData, setBetLogData] = useState<any>(null);
 
-  const handleFancyOddsUpdate = useCallback(
-    (realtimeOdds: RealTimeFancyOdds[]) => {
-      setFancyOdds((prevOdds) => {
-        return prevOdds.map((odd) => {
-          const updatedOdd = realtimeOdds.find(
-            (realOdd) => realOdd.RunnerName === odd.RunnerName
-          );
+  // const handleFancyOddsUpdate = useCallback(
+  //   (realtimeOdds: RealTimeFancyOdds[]) => {
+  //     setFancyOdds((prevOdds) => {
+  //       return prevOdds.map((odd) => {
+  //         const updatedOdd = realtimeOdds.find(
+  //           (realOdd) => realOdd.RunnerName === odd.RunnerName
+  //         );
 
-          if (updatedOdd) {
-            return {
-              ...odd,
-              BackPrice1: updatedOdd.BackPrice1 || 0,
-              BackSize1: updatedOdd.BackSize1 || 0,
-              LayPrice1: updatedOdd.LayPrice1 || 0,
-              LaySize1: updatedOdd.LaySize1 || 0,
-              isSuspended:
-                !updatedOdd.BackPrice1 ||
-                !updatedOdd.LayPrice1 ||
-                updatedOdd.GameStatus === "SUSPENDED",
-            };
-          }
-          return odd;
-        });
-      });
-    },
-    []
-  );
+  //         if (updatedOdd) {
+  //           return {
+  //             ...odd,
+  //             BackPrice1: updatedOdd.BackPrice1 || 0,
+  //             BackSize1: updatedOdd.BackSize1 || 0,
+  //             LayPrice1: updatedOdd.LayPrice1 || 0,
+  //             LaySize1: updatedOdd.LaySize1 || 0,
+  //             isSuspended:
+  //               !updatedOdd.BackPrice1 ||
+  //               !updatedOdd.LayPrice1 ||
+  //               updatedOdd.GameStatus === "SUSPENDED",
+  //           };
+  //         }
+  //         return odd;
+  //       });
+  //     });
+  //   },
+  //   []
+  // );
 
   useEffect(() => {
     if (isBrowser) {
@@ -409,7 +402,7 @@ export default function LiveMatch() {
             ...matchData,
             tv: tvUrl,
             // Use the matched iframeScoreV1 from the API response
-            iframeScoreV1: matchData.iframeScoreV1,
+            iframeScore: matchData.iframeScore,
           });
           setIsMatchLive(true);
         } else {
@@ -1077,126 +1070,144 @@ export default function LiveMatch() {
     };
   }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
 
-const processCashout = async () => {
-  setShowCashoutDialog(false);
-  toast.loading("Processing cashout...");
+  const processCashout = async () => {
+    setShowCashoutDialog(false);
+    toast.loading("Processing cashout...");
 
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const matchId = urlParams.get("match");
-    const marketId = urlParams.get("market");
-    const token = localStorage.getItem("auth_token");
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const matchId = urlParams.get("match");
+      const marketId = urlParams.get("market");
+      const token = localStorage.getItem("auth_token");
 
-    if (!matchId || !marketId || !token) {
-      toast.dismiss();
-      toast.error("Missing match, market, or auth token");
-      return;
-    }
+      if (!matchId || !marketId || !token) {
+        toast.dismiss();
+        toast.error("Missing match, market, or auth token");
+        return;
+      }
 
-    const [betRes, oddsRes] = await Promise.all([
-      fetch("https://book2500.funzip.in/api/bet-log", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch(`https://test.book2500.in/fetch-event-odds/${matchId}/${marketId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    ]);
-
-    if (!betRes.ok || !oddsRes.ok) {
-      throw new Error("Failed to fetch bet logs or odds");
-    }
-
-    const betData = await betRes.json();
-    const oddsData = (await oddsRes.json())?.data;
-
-    const matchKey = cashoutType === "match-odds" ? "matchid_matchodds" : "matchid_bookmaker";
-    const matchKeyValue = betData[matchKey]?.toString();
-
-    const pendingBets = (betData.logs || []).filter(log =>
-      log.match_id === matchKeyValue &&
-      log.is_cashed_out === 0 &&
-      log.status === "0"
-    );
-
-    if (pendingBets.length === 0) {
-      toast.dismiss();
-      toast.error("No pending bets found for cashout");
-      return;
-    }
-
-    const latestBet = pendingBets[0];
-    const selectionId = latestBet.selection_id?.toString();
-    const level = latestBet.level?.toString() || "0";
-    const isBack = latestBet.is_back === 1;
-
-    const runners = oddsData?.runners;
-    if (!runners || runners.length < 2) {
-      toast.dismiss();
-      toast.error("Runner data is incomplete or missing");
-      return;
-    }
-
-    const selectedRunner = runners.find(r => r.selectionId?.toString() === selectionId);
-    const oppositeRunner = runners.find(r => r.selectionId?.toString() !== selectionId);
-
-    if (!selectedRunner || !oppositeRunner) {
-      toast.dismiss();
-      toast.error("Could not find selected or opposite runner");
-      return;
-    }
-
-    const selPrices = isBack ? selectedRunner.back : selectedRunner.lay;
-    const oppPrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
-
-    const selPrice = selPrices.find(p => p.level?.toString() === level);
-    const oppPrice = oppPrices.find(p => p.level?.toString() === level);
-
-    const base0 = selPrice?.price ? parseFloat(selPrice.price) : 1.5;
-    const base1 = oppPrice?.price ? parseFloat(oppPrice.price) : 91;
-
-    const cashoutData = {
-      bet_invest_id: latestBet.id,
-      base0: base0.toString(),
-      base1: base1.toString(),
-    };
-
-    const result = await executeCashout(cashoutData);
-    toast.dismiss();
-
-    if (result.success) {
-      const pollingInterval = setInterval(async () => {
-        const betRes = await fetch("https://book2500.funzip.in/api/bet-log", {
+      const [betRes, oddsRes] = await Promise.all([
+        fetch("https://book2500.funzip.in/api/bet-log", {
           headers: { Authorization: `Bearer ${token}` },
-        });
+        }),
+        fetch(
+          `https://test.book2500.in/fetch-event-odds/${matchId}/${marketId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        ),
+      ]);
 
-        const betData = await betRes.json();
-        const updatedBet = betData.logs.find(log => log.id === latestBet.id);
+      if (!betRes.ok || !oddsRes.ok) {
+        throw new Error("Failed to fetch bet logs or odds");
+      }
 
-        if (updatedBet?.is_cashed_out === 1) {
-          clearInterval(pollingInterval);
-          toast.success("Cashout successful", {
-            description: `Refund: ₹${result.refund_amount.toFixed(2)}`,
+      const betData = await betRes.json();
+      const oddsData = (await oddsRes.json())?.data;
+
+      const matchKey =
+        cashoutType === "match-odds"
+          ? "matchid_matchodds"
+          : "matchid_bookmaker";
+      const matchKeyValue = betData[matchKey]?.toString();
+
+      const pendingBets = (betData.logs || []).filter(
+        (log) =>
+          log.match_id === matchKeyValue &&
+          log.is_cashed_out === 0 &&
+          log.status === "0"
+      );
+
+      if (pendingBets.length === 0) {
+        toast.dismiss();
+        toast.error("No pending bets found for cashout");
+        return;
+      }
+
+      const latestBet = pendingBets[0];
+      const selectionId = latestBet.selection_id?.toString();
+      const level = latestBet.level?.toString() || "0";
+      const isBack = latestBet.is_back === 1;
+
+      const runners = oddsData?.runners;
+      if (!runners || runners.length < 2) {
+        toast.dismiss();
+        toast.error("Runner data is incomplete or missing");
+        return;
+      }
+
+      const selectedRunner = runners.find(
+        (r) => r.selectionId?.toString() === selectionId
+      );
+      const oppositeRunner = runners.find(
+        (r) => r.selectionId?.toString() !== selectionId
+      );
+
+      if (!selectedRunner || !oppositeRunner) {
+        toast.dismiss();
+        toast.error("Could not find selected or opposite runner");
+        return;
+      }
+
+      const selPrices = isBack ? selectedRunner.back : selectedRunner.lay;
+      const oppPrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
+
+      const selPrice = selPrices.find((p) => p.level?.toString() === level);
+      const oppPrice = oppPrices.find((p) => p.level?.toString() === level);
+
+      const base0 = selPrice?.price ? parseFloat(selPrice.price) : 1.5;
+      const base1 = oppPrice?.price ? parseFloat(oppPrice.price) : 91;
+
+      interface CashoutData {
+        bet_invest_id: string; // Assuming latestBet.id is a string
+        base0: string; // base0 is converted to string with toString()
+        base1: string; // base1 is converted to string with toString()
+      }
+      
+      // Your code:
+      const cashoutData: CashoutData = {
+        bet_invest_id: latestBet.id.toString(), // Ensure latestBet.id is a string
+        base0: base0.toString(),
+        base1: base1.toString(),
+      };
+      
+      // Execute the cashout function
+      const result = await executeCashout(cashoutData);
+      toast.dismiss();
+
+      if (result.success) {
+        const pollingInterval = setInterval(async () => {
+          const betRes = await fetch("https://book2500.funzip.in/api/bet-log", {
+            headers: { Authorization: `Bearer ${token}` },
           });
 
-          // ✅ Update local state to reflect latest data
-          setBetLogData(updatedBet);
+          const betData = await betRes.json();
+          const updatedBet = betData.logs.find(
+            (log) => log.id === latestBet.id
+          );
 
-          updateBalanceFromAPI();
-        }
-      }, 3000);
-    } else {
-      toast.error("Cashout failed", { description: result.message });
+          if (updatedBet?.is_cashed_out === 1) {
+            clearInterval(pollingInterval);
+            toast.success("Cashout successful", {
+              description: `Refund: ₹${result.refund_amount.toFixed(2)}`,
+            });
+
+            // ✅ Update local state to reflect latest data
+            setBetLogData(updatedBet);
+
+            updateBalanceFromAPI();
+          }
+        }, 3000);
+      } else {
+        toast.error("Cashout failed", { description: result.message });
+      }
+    } catch (error) {
+      console.error("Cashout error:", error);
+      toast.dismiss();
+      toast.error("Cashout process encountered an error");
     }
+  };
 
-  } catch (error) {
-    console.error("Cashout error:", error);
-    toast.dismiss();
-    toast.error("Cashout process encountered an error");
-  }
-};
-
-  
-  
   const handleCashoutClick = useCallback(
     (e: React.MouseEvent, type: string) => {
       e.preventDefault();
@@ -1215,6 +1226,7 @@ const processCashout = async () => {
         base0 = betLogData?.base0_matchodds || "";
         base1 = betLogData?.base1_matchodds || "";
       } else if (type === "bookmaker-odds") {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         potentialInvest = betLogData?.potential_invest_bookmaker || "";
         potentialReturn = betLogData?.potential_return_bookmaker || "";
         isBack = betLogData?.is_back_bookmaker || 0;
@@ -1263,9 +1275,9 @@ const processCashout = async () => {
             </div>
 
             <div className="w-full h-[155px] bg-black rounded-lg overflow-hidden">
-              {liveMatchData?.iframeScoreV1 && (
+              {liveMatchData?.iframeScore && (
                 <iframe
-                  src={liveMatchData.iframeScoreV1}
+                  src={liveMatchData.iframeScore}
                   className="w-full h-full border-0"
                   scrolling="no"
                   style={{
@@ -2133,8 +2145,8 @@ const processCashout = async () => {
                 />
 
                 <div className="grid grid-cols-4 gap-3">
-                  {PREDEFINED_STAKES.low
-                    .concat(PREDEFINED_STAKES.high)
+                  {(PREDEFINED_STAKES.low as number[])
+                    .concat(PREDEFINED_STAKES.high as number[])
                     .map((stake, index) => (
                       <button
                         key={index}
