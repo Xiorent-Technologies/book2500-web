@@ -321,7 +321,7 @@ export default function LiveMatch() {
   // const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
   //   []
   // );
-  // const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
+  const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   interface BetLogData {
     id: string;
     amount: number;
@@ -616,7 +616,8 @@ export default function LiveMatch() {
         console.error("Error fetching fancy odds:", error);
         setFancyOddsMappings([]);
       }
-    };
+    }
+  });
 
   //   fetchInitialFancyOdds();
   //   const interval = setInterval(fetchInitialFancyOdds, 1500);
@@ -627,72 +628,66 @@ export default function LiveMatch() {
     const updateFancyOdds = async () => {
       if (!eventId || !marketId) return;
       // Your logic to update the fancy odds
-    };
-  
-    // Call the function initially
-    updateFancyOdds();
-  
-    // Set the interval to update fancy odds every 1500ms
-    const interval = setInterval(updateFancyOdds, 1500);
-  
-    // Cleanup interval on component unmount
-    return () => clearInterval(interval);
-  }, [eventId, marketId]); 
+   
+      try {
+        const response = await fetch(
+          `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
+        );
 
-    try {
-      const response = await fetch(
-        `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
-      );
+        interface RealtimeOdd {
+          RunnerName: string;
+        }
+          // Y
+        const responseData = await response.json();
 
-      interface RealtimeOdd {
-        RunnerName: string;
-      }
-        // Y
-      const responseData = await response.json();
+        if (responseData?.data) {
+          // Update the fancy odds state with the new data
+          setFancyOddsMappings((prevOdds) => {
+            return prevOdds.map((odd) => {
+              // Find matching runner by RunnerName
+              const realtimeOdd = responseData.data.find(
+                (r: { RunnerName: string }) => r.RunnerName === odd.RunnerName
+              );
 
-      if (responseData?.data) {
-        // Update the fancy odds state with the new data
-        setFancyOddsMappings((prevOdds) => {
-          return prevOdds.map((odd) => {
-            // Find matching runner by RunnerName
-            const realtimeOdd = responseData.data.find(
-              (r: { RunnerName: string }) => r.RunnerName === odd.RunnerName
-            );
-
-            if (realtimeOdd) {
-              return {
-                ...odd,
-                back: odd.back
-                  ? {
-                      ...odd.back,
-                      price: realtimeOdd.BackPrice1,
-                      size: realtimeOdd.BackSize1,
-                      isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
-                    }
-                  : null,
-                lay: odd.lay
-                  ? {
-                      ...odd.lay,
-                      price: realtimeOdd.LayPrice1,
-                      size: realtimeOdd.LaySize1,
-                      isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
-                    }
-                  : null,
-              };
-            }
-            return odd;
+              if (realtimeOdd) {
+                return {
+                  ...odd,
+                  back: odd.back
+                    ? {
+                        ...odd.back,
+                        price: realtimeOdd.BackPrice1,
+                        size: realtimeOdd.BackSize1,
+                        isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
+                      }
+                    : null,
+                  lay: odd.lay
+                    ? {
+                        ...odd.lay,
+                        price: realtimeOdd.LayPrice1,
+                        size: realtimeOdd.LaySize1,
+                        isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
+                      }
+                    : null,
+                };
+              }
+              return odd;
+            });
           });
-        });
+        }
+      } catch (error) {
+        console.error("Error updating fancy odds:", error);
       }
-    } catch (error) {
-      console.error("Error updating fancy odds:", error);
     }
-  };
-
-  useEffect(() => {
+    updateFancyOdds();
     const interval = setInterval(updateFancyOdds, 1500);
+  
     return () => clearInterval(interval);
-  }, [eventId, marketId,updateFancyOdds]);
+  }, [eventId, marketId]);
+
+  // useEffect(() => {
+  //   const interval = setInterval(updateFancyOdds, 1500);
+  //   return () => clearInterval(interval);
+  // }, [eventId, marketId,updateFancyOdds]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
