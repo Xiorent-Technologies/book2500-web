@@ -524,7 +524,7 @@ export default function LiveMatch() {
         // Create a mapping of SelectionId to prediction data
         const oddsMapping: OddsMapping = {};
         data.data.forEach((odd: PredictionData) => {
-          oddsMapping[odd.selection_id] = odd;
+          oddsMapping[odd.selectionId] = odd;
         });
 
         // Store the mapping for later use

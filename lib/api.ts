@@ -73,7 +73,7 @@ export interface PredictionData {
   invest_amount: number;
   betoption_id: number;
   betquestion_id: number;
-  
+  selectionId: string; // This is the same as selection_id in the original code
   // SelectionId: string;
   match_id: number;
   selection_id: string;
