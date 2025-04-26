@@ -73,7 +73,7 @@ export interface PredictionData {
   invest_amount: number;
   betoption_id: number;
   betquestion_id: number;
-  SelectionId: string;
+  // SelectionId: string;
   match_id: number;
   selection_id: string;
   ratio: string;
