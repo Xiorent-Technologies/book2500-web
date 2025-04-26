@@ -524,7 +524,7 @@ export default function LiveMatch() {
         // Create a mapping of SelectionId to prediction data
         const oddsMapping: OddsMapping = {};
         data.data.forEach((odd: PredictionData) => {
-          oddsMapping[odd.selection_id] = odd;
+          oddsMapping[odd.SelectionId] = odd;
         });
 
         // Store the mapping for later use
@@ -912,6 +912,7 @@ export default function LiveMatch() {
 
       const requestBody: any = {
         SelectionId: String(selectedBet.selectionId) || "",
+        selection_id: String(selectedBet.selectionId) || "", // Add this line
         RunnerName: selectedBet.name,
         Option_name: selectedBet.name,
         Option_id: selectedBet.betoption_id,
