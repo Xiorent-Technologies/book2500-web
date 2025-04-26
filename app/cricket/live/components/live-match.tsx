@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,7 +21,7 @@ const MIN_STAKE = 100;
 const MAX_STAKE = 250000;
 
 // Add this constant for predefined stakes
-const PREDEFINED_STAKES = {
+const PREDEFINED_STAKES : any= {
   low: [100, 500, 1000, 2000],
   high: [5000, 10000, 25000, 50000],
 } as const;
@@ -29,14 +29,10 @@ const PREDEFINED_STAKES = {
 const isBrowser = typeof window !== "undefined";
 
 interface Runner {
-  Option_id: number;
-  Question_id: number;
-  selectionId: number | string;
-  runner: string;
-  ex?: {
-    availableToBack?: Array<{ price: number; size: number }>;
-    availableToLay?: Array<{ price: number; size: number }>;
-  };
+  selectionId: string;
+  back: RunnerPrice[];
+  lay: RunnerPrice[];
+  runner:any
 }
 
 interface SelectedBet {
@@ -140,14 +136,29 @@ interface FancyOddsMapping {
   RunnerName: string;
   Match_id: string;
   Question_id: number;
-  Option_id: number;
-  Option_name: string;
-  SelectionId: string;
-  min: string;
-  max: string;
+  back?: {
+    Option_id: number;
+    Option_name: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+    price: number;
+    size: number;
+    isSuspended?: boolean;
+  };
+  lay?: {
+    Option_id: number;
+    Option_name: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+    price: number;
+    size: number;
+    isSuspended?: boolean;
+  };
 }
 
-interface FancyOddApiData {
+interface FancyApiMapping {
   RunnerName: string;
   Match_id: number;
   Question_id: number;
@@ -160,14 +171,11 @@ interface FancyOddApiData {
 
 interface FancyOddsResponse {
   RunnerName: string;
-  LayPrice1: number;
-  LaySize1: number;
   BackPrice1: number;
   BackSize1: number;
-  SelectionId: string;
+  LayPrice1: number;
+  LaySize1: number;
   GameStatus: string;
-  min: string;
-  max: string;
 }
 
 interface InitialFancyData {
@@ -272,6 +280,119 @@ function CashoutDialog({
   );
 }
 
+interface OddsMapping {
+  [key: string]: PredictionData;
+}
+
+interface RealTimeOdds {
+  data?: {
+    runners: Array<{
+      selectionId: number;
+      ex?: {
+        availableToBack?: Array<{ price: number; size: number }>;
+        availableToLay?: Array<{ price: number; size: number }>;
+      };
+    }>;
+  };
+}
+
+interface GroupedFancyOdd {
+  RunnerName: string;
+  Match_id: string;
+  Question_id: number;
+  back?: {
+    Option_id: number;
+    Option_name: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+    price: number;
+    size: number;
+    isSuspended?: boolean;
+  };
+  lay?: {
+    Option_id: number;
+    Option_name: string;
+    SelectionId: string;
+    min: string;
+    max: string;
+    price: number;
+    size: number;
+    isSuspended?: boolean;
+  };
+}
+
+interface FancyApiMapping {
+  RunnerName: string;
+  Question_id: number;
+  Option_id: number;
+  Option_name: string;
+  SelectionId: string;
+  min: string;
+  max: string;
+}
+
+interface CashoutData {
+  bet_invest_id: number;
+  base0: string;
+  base1: string;
+}
+
+interface EventOddsState {
+  eventName: string;
+  marketId?: string;
+  runners: Runner[];
+}
+
+interface BookmakerMapping {
+  SelectionId: string;
+  Option_id: number;
+  Option_name: string;
+  Question_id: number;
+  Match_id: string;
+}
+
+interface BetLog {
+  id: string;
+  match_id: string;
+  selection_id: string;
+  is_cashed_out: number;
+  status: string;
+  is_back: number;
+  level: string;
+  selection_id_matchodds?: string;
+  selection_id_bookmaker?: string;
+  potential_invest_matchodds?: string;
+  potential_return_matchodds?: string;
+  is_back_matchodds?: number;
+  potential_invest_bookmaker?: string;
+  potential_return_bookmaker?: string;
+  is_back_bookmaker?: number;
+  base0_matchodds:string;
+  base0_bookmaker:string;
+  base1_bookmaker:string;
+  base1_matchodds:string;
+}
+
+interface BetLogEntry {
+  match_id: string;
+  is_cashed_out: number;
+  status: string;
+  selection_id: string;
+  level: string;
+}
+
+interface RunnerPrice {
+  level: string;
+  price: string;
+}
+
+interface CashoutResponse {
+  success: boolean;
+  refund_amount: number;
+  message?: string;
+}
+
 export default function LiveMatch() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -281,82 +402,31 @@ export default function LiveMatch() {
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
   const [selectedOdds, setSelectedOdds] = useState("");
   const [selectedStake, setSelectedStake] = useState("");
-  const [eventOdds, setEventOdds] = useState<{
-    eventName: string;
-    marketId?: string;
-    runners: Runner[];
-  }>({ eventName: "", marketId: "", runners: [] });
+  const [eventOdds, setEventOdds] = useState<EventOddsState>({
+    eventName: "",
+    marketId: "",
+    runners: [],
+  });
   const [fancyOdds, setFancyOdds] = useState<FancyOdds[]>([]);
-  const [bookmakerMarket, setBookmakerMarket] =
-    useState<BookmakerMarket | null>(null);
+  const [bookmakerMarket, setBookmakerMarket] = useState<BookmakerMarket | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [betError, setBetError] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<string>("0");
   const [showMobileBetForm, setShowMobileBetForm] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(
-    null
-  );
+  const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     matchOdds: true,
     bookmaker: true,
     fancy: true,
   });
   const [isMatchLive, setIsMatchLive] = useState(false);
-  interface FancyOddsMapping {
-    id: number;
-    name: string;
-    odds: number;
-    description?: string;  // Optional property
-  }
-  
   const [fancyOddsMappings, setFancyOddsMappings] = useState<FancyOddsMapping[]>([]);
-  // const [fancyApiData, setFancyApiData] = useState<FancyOddApiData[]>([]);
-  // const [initialOdds, setInitialOdds] = useState<EventOddsResponse["data"]>([]);
   const [matchApiData, setMatchApiData] = useState<EventOddApiData[]>([]);
   const [showCashoutDialog, setShowCashoutDialog] = useState<boolean>(false);
-
   const [cashoutType, setCashoutType] = useState<string>("");
-  // const [cashoutSelectionId, setCashoutSelectionId] = useState<string>("");
-  // const [groupedFancyOdds, setGroupedFancyOdds] = useState<GroupedFancyOdds[]>(
-  //   []
-  // );
+  const [betLogData, setBetLogData] = useState<BetLog | null>(null);
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
-  interface BetLogData {
-    id: string;
-    amount: number;
-    timestamp: string;
-    // Add other properties that you expect
-  }
-  
-  const [betLogData, setBetLogData] = useState<BetLogData | null>(null);
-  // const handleFancyOddsUpdate = useCallback(
-  //   (realtimeOdds: RealTimeFancyOdds[]) => {
-  //     setFancyOdds((prevOdds) => {
-  //       return prevOdds.map((odd) => {
-  //         const updatedOdd = realtimeOdds.find(
-  //           (realOdd) => realOdd.RunnerName === odd.RunnerName
-  //         );
-
-  //         if (updatedOdd) {
-  //           return {
-  //             ...odd,
-  //             BackPrice1: updatedOdd.BackPrice1 || 0,
-  //             BackSize1: updatedOdd.BackSize1 || 0,
-  //             LayPrice1: updatedOdd.LayPrice1 || 0,
-  //             LaySize1: updatedOdd.LaySize1 || 0,
-  //             isSuspended:
-  //               !updatedOdd.BackPrice1 ||
-  //               !updatedOdd.LayPrice1 ||
-  //               updatedOdd.GameStatus === "SUSPENDED",
-  //           };
-  //         }
-  //         return odd;
-  //       });
-  //     });
-  //   },
-  //   []
-  // );
 
   useEffect(() => {
     if (isBrowser) {
@@ -391,7 +461,7 @@ export default function LiveMatch() {
       } catch (error) {
         console.error("Error in balance interval:", error);
       }
-    }, 5000);
+    }, 1500);
 
     return () => clearInterval(balanceInterval);
   }, []);
@@ -463,7 +533,7 @@ export default function LiveMatch() {
         setEventOdds({
           eventName: data.data[0]?.RunnerName || "",
           marketId: marketId,
-          runners: data.data.map((odd) => ({
+          runners: data.data.map((odd:any) => ({
             selectionId: odd.SelectionId,
             runner: odd.Option_name,
             Option_id: odd.Option_id,
@@ -495,10 +565,9 @@ export default function LiveMatch() {
       const data: RealTimeOdds = await response.json();
 
       if (data?.data?.runners) {
-        setEventOdds((prev) => ({
-          ...prev,
-          runners: prev.runners.map((runner) => {
-            const realtimeRunner = data.data.runners.find(
+        setEventOdds((prev) => {
+          const updatedRunners = prev.runners.map((runner) => {
+            const realtimeRunner = data.data?.runners?.find(
               (r) => String(r.selectionId) === String(runner.selectionId)
             );
 
@@ -519,8 +588,13 @@ export default function LiveMatch() {
                 ],
               },
             };
-          }),
-        }));
+          });
+
+          return {
+            ...prev,
+            runners: updatedRunners,
+          };
+        });
       }
     } catch (err) {
       console.error("Error fetching real-time odds:", err);
@@ -528,13 +602,8 @@ export default function LiveMatch() {
   }, [eventId, marketId, eventOdds.runners.length]);
 
   useEffect(() => {
-    // Initial fetch
     fetchOddsData();
-
-    // Set up polling interval
     const interval = setInterval(fetchOddsData, 1200);
-
-    // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [fetchOddsData]);
 
@@ -565,7 +634,7 @@ export default function LiveMatch() {
           // Group odds by RunnerName
           const groupedOdds = data.data.reduce(
             (
-              acc: { [key: string]: GroupedFancyOdd },
+              acc: { [key: string]: any },
               curr: FancyApiMapping
             ) => {
               const key = `${curr.Question_id}-${curr.RunnerName}`;
@@ -616,78 +685,74 @@ export default function LiveMatch() {
         console.error("Error fetching fancy odds:", error);
         setFancyOddsMappings([]);
       }
-    }
-  });
+    };
 
-  //   fetchInitialFancyOdds();
-  //   const interval = setInterval(fetchInitialFancyOdds, 1500);
-  //   return () => clearInterval(interval);
-  // }, [eventId, marketId]);
-
-  useEffect(() => {
-    const updateFancyOdds = async () => {
-      if (!eventId || !marketId) return;
-      // Your logic to update the fancy odds
-   
-      try {
-        const response = await fetch(
-          `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
-        );
-
-        interface RealtimeOdd {
-          RunnerName: string;
-        }
-          // Y
-        const responseData = await response.json();
-
-        if (responseData?.data) {
-          // Update the fancy odds state with the new data
-          setFancyOddsMappings((prevOdds) => {
-            return prevOdds.map((odd) => {
-              // Find matching runner by RunnerName
-              const realtimeOdd = responseData.data.find(
-                (r: { RunnerName: string }) => r.RunnerName === odd.RunnerName
-              );
-
-              if (realtimeOdd) {
-                return {
-                  ...odd,
-                  back: odd.back
-                    ? {
-                        ...odd.back,
-                        price: realtimeOdd.BackPrice1,
-                        size: realtimeOdd.BackSize1,
-                        isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
-                      }
-                    : null,
-                  lay: odd.lay
-                    ? {
-                        ...odd.lay,
-                        price: realtimeOdd.LayPrice1,
-                        size: realtimeOdd.LaySize1,
-                        isSuspended: realtimeOdd.GameStatus === "SUSPENDED",
-                      }
-                    : null,
-                };
-              }
-              return odd;
-            });
-          });
-        }
-      } catch (error) {
-        console.error("Error updating fancy odds:", error);
-      }
-    }
-    updateFancyOdds();
-    const interval = setInterval(updateFancyOdds, 1500);
-  
+    fetchInitialFancyOdds();
+    const interval = setInterval(fetchInitialFancyOdds, 1500);
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
-  // useEffect(() => {
-  //   const interval = setInterval(updateFancyOdds, 1500);
-  //   return () => clearInterval(interval);
-  // }, [eventId, marketId,updateFancyOdds]);
+  const updateFancyOdds = useCallback(async () => {
+    if (!eventId || !marketId) return;
+
+    try {
+      const response = await fetch(
+        `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
+      );
+      const data = await response.json();
+      
+      if (data?.data) {
+        setFancyOddsMappings((prev) => {
+          const newMappings = prev.map((mapping) => {
+            const runner = data.data.find(
+              (r: { RunnerName: string; BackPrice1: number; BackSize1: number; LayPrice1: number; LaySize1: number; isSuspended: boolean }) => 
+                r.RunnerName === mapping.RunnerName
+            );
+            
+            if (runner && mapping.back && mapping.lay) {
+              return {
+                ...mapping,
+                back: {
+                  ...mapping.back,
+                  price: runner.BackPrice1 || 0,
+                  size: runner.BackSize1 || 0,
+                  isSuspended: runner.isSuspended || false
+                },
+                lay: {
+                  ...mapping.lay,
+                  price: runner.LayPrice1 || 0,
+                  size: runner.LaySize1 || 0,
+                  isSuspended: runner.isSuspended || false
+                }
+              };
+            }
+            return mapping;
+          });
+          return newMappings;
+        });
+      }
+    } catch (error) {
+      console.error("Error updating fancy odds:", error);
+    }
+  }, [eventId, marketId]);
+
+  useEffect(() => {
+    let mounted = true;
+    
+    const fetchAndUpdate = async () => {
+      if (mounted) {
+        await updateFancyOdds();
+      }
+    };
+
+    fetchAndUpdate();
+    const interval = setInterval(fetchAndUpdate, 1000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [updateFancyOdds]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
@@ -707,7 +772,6 @@ export default function LiveMatch() {
 
       const data = await response.json();
       if (data?.data) {
-        // console.log(data.data);
         setBookmakerMappings(data.data);
       }
     } catch (error) {
@@ -727,7 +791,7 @@ export default function LiveMatch() {
         `https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`
       );
       const data = await response.json();
-
+      console.log('data',data)
       if (data?.data) {
         setBookmakerMarket(data.data);
         // console.log(data.data);
@@ -799,11 +863,11 @@ export default function LiveMatch() {
   const handlePlaceBet = async () => {
     if (!isBrowser || !selectedBet) return;
 
-    toast.loading("Processing your bet...");
+    const loadingToast = toast.loading("Processing your bet...");
 
     try {
       if (!selectedBet || !selectedOdds || !selectedStake) {
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.error("Unable to place bet", {
           description: "Please select odds and enter stake amount",
         });
@@ -812,7 +876,7 @@ export default function LiveMatch() {
 
       const token = localStorage.getItem("auth_token");
       if (!token) {
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.error("Authentication required", {
           description: "Please login to place bets",
         });
@@ -822,7 +886,7 @@ export default function LiveMatch() {
 
       const stakeAmount = parseInt(selectedStake, 10);
       if (isNaN(stakeAmount) || stakeAmount < MIN_STAKE) {
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.error("Invalid stake amount", {
           description: `Minimum stake amount is ₹${MIN_STAKE}`,
         });
@@ -830,7 +894,7 @@ export default function LiveMatch() {
       }
 
       if (stakeAmount > MAX_STAKE) {
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.error("Invalid stake amount", {
           description: `Maximum stake amount is ₹${MAX_STAKE}`,
         });
@@ -839,30 +903,28 @@ export default function LiveMatch() {
 
       const userBalanceNum = parseInt(userBalance, 10);
       if (stakeAmount > userBalanceNum) {
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.error("Insufficient balance", {
           description: `Available balance: ₹${userBalanceNum}`,
         });
         return;
       }
 
-      // Prepare request body according to PredictionData interface
-      const requestBody: PredictionData = {
+      const requestBody: any = {
+        SelectionId: String(selectedBet.selectionId) || "",
+        RunnerName: selectedBet.name,
+        Option_name: selectedBet.name,
+        Option_id: selectedBet.betoption_id,
+        Question_id: selectedBet.betquestion_id,
+        Match_id: selectedBet.match_id,
         invest_amount: stakeAmount,
         betoption_id: selectedBet.betoption_id,
         betquestion_id: selectedBet.betquestion_id,
         match_id: selectedBet.match_id,
-        selection_id: String(selectedBet.selectionId) || "", // Make sure selectionId is included
         ratio: selectedOdds,
-        isback:
-          selectedBet.type.toLowerCase() === "back" ||
-          selectedBet.type.toLowerCase() === "no"
-            ? 1
-            : 0,
-        level: 1,
+        isback: selectedBet.type.toLowerCase() === "back" || selectedBet.type.toLowerCase() === "no" ? 1 : 0,
+        level: 1
       };
-
-      // console.log("Prediction request:", requestBody); // For debugginging
 
       const response = await fetch(
         "https://book2500.funzip.in/api/prediction",
@@ -878,7 +940,7 @@ export default function LiveMatch() {
       );
 
       const data = await response.json();
-      toast.dismiss();
+      toast.dismiss(loadingToast);
 
       if (!data.success) {
         if (data.message === "Time has been expired") {
@@ -904,7 +966,6 @@ export default function LiveMatch() {
         description: `${selectedBet.name} - ₹${selectedStake} @ ${selectedOdds}\nMarket: ${selectedBet.section}`,
       });
 
-      // Only fetch bet log after successful prediction
       await fetchBetLog();
 
       const newBalance = (userBalanceNum - stakeAmount).toString();
@@ -922,7 +983,7 @@ export default function LiveMatch() {
       setSelectedBet(null);
       setShowMobileBetForm(false);
     } catch (error: unknown) {
-      toast.dismiss();
+      toast.dismiss(loadingToast);
       console.error("Error details:", error);
       toast.error("Bet placement failed", {
         description:
@@ -935,18 +996,18 @@ export default function LiveMatch() {
 
   // Add this helper function to check runner types
   interface Runner {
-    runner: string;
-    ex: string;
+    runner: any;
+    ex: any;
+    selectionId:string
     // Add any other properties that are part of the Runner type
   }
   
-  const isMatchRunner = (runner: any): runner is Runner => {
+  const isMatchRunner = (runner: unknown): runner is Runner => {
     return typeof runner === 'object' && runner !== null && 'runner' in runner && 'ex' in runner;
   };
-  
 
   const handleOddsClick = (
-    runner: Runner | BookmakerRunner | FancyOdds,
+    runner: Runner | BookmakerRunner | FancyOdds , 
     type: "back" | "lay" | "no" | "yes",
     section: "match" | "bookmaker" | "fancy",
     index: number = 0 // Add index parameter
@@ -1089,7 +1150,7 @@ export default function LiveMatch() {
     const potentialReturn = stake + profit;
 
     const otherTeam =
-      eventOdds.runners?.find((r) => r.runner !== selectedBet?.name)?.runner ||
+      eventOdds.runners?.find((r:any) => r.runner !== selectedBet?.name)?.runner ||
       "";
 
     return {
@@ -1145,7 +1206,7 @@ export default function LiveMatch() {
       const matchKeyValue = betData[matchKey]?.toString();
 
       const pendingBets = (betData.logs || []).filter(
-        (log) =>
+        (log: BetLogEntry) =>
           log.match_id === matchKeyValue &&
           log.is_cashed_out === 0 &&
           log.status === "0"
@@ -1162,7 +1223,7 @@ export default function LiveMatch() {
       const level = latestBet.level?.toString() || "0";
       const isBack = latestBet.is_back === 1;
 
-      const runners = oddsData?.runners;
+      const runners = oddsData?.runners as any[];
       if (!runners || runners.length < 2) {
         toast.dismiss();
         toast.error("Runner data is incomplete or missing");
@@ -1170,10 +1231,10 @@ export default function LiveMatch() {
       }
 
       const selectedRunner = runners.find(
-        (r) => r.selectionId?.toString() === selectionId
+        (r: any) => r.selectionId?.toString() === selectionId
       );
       const oppositeRunner = runners.find(
-        (r) => r.selectionId?.toString() !== selectionId
+        (r: any) => r.selectionId?.toString() !== selectionId
       );
 
       if (!selectedRunner || !oppositeRunner) {
@@ -1185,51 +1246,29 @@ export default function LiveMatch() {
       const selPrices = isBack ? selectedRunner.back : selectedRunner.lay;
       const oppPrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
 
-      const selPrice = selPrices.find((p) => p.level?.toString() === level);
-      const oppPrice = oppPrices.find((p) => p.level?.toString() === level);
+      const selPrice = selPrices.find((p: RunnerPrice) => p.level?.toString() === level);
+      const oppPrice = oppPrices.find((p: RunnerPrice) => p.level?.toString() === level);
 
       const base0 = selPrice?.price ? parseFloat(selPrice.price) : 1.5;
       const base1 = oppPrice?.price ? parseFloat(oppPrice.price) : 91;
 
-      interface CashoutData {
-        bet_invest_id: string; // Assuming latestBet.id is a string
-        base0: string; // base0 is converted to string with toString()
-        base1: string; // base1 is converted to string with toString()
-      }
-      
-      // Your code:
       const cashoutData: CashoutData = {
-        bet_invest_id: latestBet.id.toString(), // Ensure latestBet.id is a string
+        bet_invest_id: Number(latestBet.id),
         base0: base0.toString(),
         base1: base1.toString(),
       };
-      
-      // Execute the cashout function
-      const result = await executeCashout(cashoutData);
+
+      const result = await executeCashout(cashoutData as any);
       toast.dismiss();
 
       if (result.success) {
         const pollingInterval = setInterval(async () => {
-          const betRes = await fetch("https://book2500.funzip.in/api/bet-log", {
-            headers: { Authorization: `Bearer ${token}` },
+          fetchBetLog();
+          clearInterval(pollingInterval);
+          toast.success("Cashout successful", {
+            description: `Refund: ₹${result.refund_amount?.toFixed(2) || "0.00"}`,
           });
-
-          const betData = await betRes.json();
-          const updatedBet = betData.logs.find(
-            (log) => log.id === latestBet.id
-          );
-
-          if (updatedBet?.is_cashed_out === 1) {
-            clearInterval(pollingInterval);
-            toast.success("Cashout successful", {
-              description: `Refund: ₹${result.refund_amount.toFixed(2)}`,
-            });
-
-            // ✅ Update local state to reflect latest data
-            setBetLogData(updatedBet);
-
-            updateBalanceFromAPI();
-          }
+          updateBalanceFromAPI();
         }, 3000);
       } else {
         toast.error("Cashout failed", { description: result.message });
@@ -1357,7 +1396,7 @@ export default function LiveMatch() {
 
               {expandedSections.matchOdds && (
                 <div className="p-0">
-                  {eventOdds.runners?.map((runner, idx) => {
+                  {eventOdds.runners?.map((runner:any, idx) => {
                     const isSuspended = [0, 1, 2].some((index) => {
                       const backOdds =
                         runner.ex?.availableToBack?.[index]?.price ?? 0;
@@ -1543,7 +1582,7 @@ export default function LiveMatch() {
                     </div>
                   </div>
                   {/* First team in bookmaker */}
-                  {bookmakerMarket?.runners?.[0] && (
+                  {bookmakerMarket?.runners && bookmakerMappings?.length > 0 && (
                     <div
                       key={bookmakerMarket.runners[0].selectionId}
                       className="border-b border-purple-900"
@@ -1661,7 +1700,7 @@ export default function LiveMatch() {
                   )}
 
                   {/* Marquee between teams */}
-                  {bookmakerMarket?.rem && (
+                  {bookmakerMarket?.rem && bookmakerMappings?.length > 0 &&  (
                     <div className="p-2 border-b border-purple-900">
                       <div className="whitespace-nowrap animate-marquee">
                         <span className="text-red-500 font-medium">
@@ -1672,7 +1711,7 @@ export default function LiveMatch() {
                   )}
 
                   {/* Second team in bookmaker */}
-                  {bookmakerMarket?.runners?.[1] && (
+                  {bookmakerMarket?.runners?.[1] && bookmakerMappings?.length > 0 && (
                     <div
                       key={bookmakerMarket.runners[1].selectionId}
                       className="border-b border-purple-900"
@@ -1790,7 +1829,7 @@ export default function LiveMatch() {
                   )}
 
                   {/* Marquee between teams */}
-                  {bookmakerMarket?.rem && (
+                  {bookmakerMarket?.rem && bookmakerMappings?.length > 0 && (
                     <div className="p-2 border-b border-purple-900">
                       <div className="whitespace-nowrap animate-marquee">
                         <span className="text-red-500 font-medium">
@@ -2002,7 +2041,7 @@ export default function LiveMatch() {
                     placeholder="Stakes"
                   />
                   <div className="grid grid-cols-4 gap-2 mb-2">
-                    {PREDEFINED_STAKES.low.map((stake, index) => (
+                    {PREDEFINED_STAKES.low.map((stake:any, index:number) => (
                       <Button
                         key={`stake-${index}`}
                         onClick={() => handleStakeButton("predefined", stake)}
@@ -2013,7 +2052,7 @@ export default function LiveMatch() {
                     ))}
                   </div>
                   <div className="grid grid-cols-4 gap-2 mb-2">
-                    {PREDEFINED_STAKES.high.map((stake, index) => (
+                    {PREDEFINED_STAKES.high.map((stake:any, index:number) => (
                       <Button
                         key={`stake-${index}`}
                         onClick={() => handleStakeButton("predefined", stake)}
