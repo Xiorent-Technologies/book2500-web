@@ -55,7 +55,9 @@ export default function DepositPage() {
   const [receiptImage, setReceiptImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
-  // const [userData, setUserData] = useState<UserData | null>(null);
+ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+const [userData, setUserData] = useState<UserData | null>(null);
+
 
   const fetchGateways = useCallback(async () => {
     try {
