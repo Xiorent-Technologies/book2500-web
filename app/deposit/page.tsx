@@ -278,7 +278,7 @@ export default function DepositPage() {
                                 </div>
                               )}
                               <div className="text-xs text-gray-400 mt-1">
-                                Mobile: {userData?.mobile}
+                                Mobile: 9352415245
                               </div>
                             </div>
                           </div>
