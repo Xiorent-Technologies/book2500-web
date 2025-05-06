@@ -558,7 +558,7 @@ export default function LiveMatch() {
     if (!eventId || !marketId || !eventOdds.runners.length) return;
 
     const response = await fetch(
-      `http://test.book2500.in/api/bet/insert-question/${eventId}/${marketId}`
+      `https://test.book2500.in/api/bet/insert-question/${eventId}/${marketId}`
     );
     console.log('responseresponse', response)
     try {
@@ -612,7 +612,7 @@ export default function LiveMatch() {
 
       try {
         const response = await fetch(
-          `http://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
+          `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
         );
 
         const data = await response.json();
