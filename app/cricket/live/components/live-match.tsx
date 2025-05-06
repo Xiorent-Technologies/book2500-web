@@ -671,7 +671,7 @@ export default function LiveMatch() {
     };
 
     fetchInitialFancyOdds();
-    const interval = setInterval(fetchInitialFancyOdds, 1500);
+    const interval = setInterval(fetchInitialFancyOdds, 2500);
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
@@ -729,7 +729,7 @@ export default function LiveMatch() {
     };
 
     fetchAndUpdate();
-    const interval = setInterval(fetchAndUpdate, 1000);
+    const interval = setInterval(fetchAndUpdate, 2500);
 
     return () => {
       mounted = false;
