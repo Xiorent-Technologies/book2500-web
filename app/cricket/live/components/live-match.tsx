@@ -614,7 +614,6 @@ export default function LiveMatch() {
         const response = await fetch(
           `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
         );
-
         const data = await response.json();
         if (data && Array.isArray(data.data)) {
           // Group odds by RunnerName
@@ -623,9 +622,9 @@ export default function LiveMatch() {
               acc: { [key: string]: any },
               curr: any
             ) => {
-              if (!curr || !curr.runnerName || !curr.SelectionId) {
-                return acc;
-              }
+              // if (!curr || !curr.runnerName || !curr.SelectionId) {
+              //   return acc;
+              // }
 
               const key = `${curr.SelectionId}-${curr.runnerName}`;
 
@@ -671,7 +670,7 @@ export default function LiveMatch() {
     };
 
     fetchInitialFancyOdds();
-    const interval = setInterval(fetchInitialFancyOdds, 2500);
+    const interval = setInterval(fetchInitialFancyOdds, 1500);
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
@@ -680,13 +679,19 @@ export default function LiveMatch() {
 
     try {
       const response = await fetch(
-        `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
+        `https://book2500.funzip.in/api/fancy-odds`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, market_id: marketId }),
+        }
       );
       const data = await response.json();
-
+console.log('==================',data)
       if (data?.data) {
         setFancyOddsMappings((prev) => {
           const newMappings = prev.map((mapping) => {
+            console.log('mapping',mapping)
             const runner = data.data.find(
               (r: { RunnerName: string; BackPrice1: number; BackSize1: number; LayPrice1: number; LaySize1: number; isSuspended: boolean }) =>
                 r.RunnerName === mapping.RunnerName
@@ -1305,8 +1310,8 @@ export default function LiveMatch() {
                                 <>
                                   <span
                                     className={`${betLogData.is_back_matchodds === 1
-                                        ? "text-green-400"
-                                        : "text-red-400"
+                                      ? "text-green-400"
+                                      : "text-red-400"
                                       }`}
                                   >
                                     {betLogData.is_back_matchodds === 1
@@ -1330,8 +1335,8 @@ export default function LiveMatch() {
                                 // For the other team, show the investment amount with opposite sign
                                 <span
                                   className={`text-xs ${betLogData.is_back_matchodds === 1
-                                      ? "text-red-400"
-                                      : "text-green-400"
+                                    ? "text-red-400"
+                                    : "text-green-400"
                                     }`}
                                 >
                                   {betLogData.is_back_matchodds === 1
@@ -1479,8 +1484,8 @@ export default function LiveMatch() {
                               <>
                                 <span
                                   className={`${betLogData.is_back_bookmaker === 1
-                                      ? "text-green-400"
-                                      : "text-red-400"
+                                    ? "text-green-400"
+                                    : "text-red-400"
                                     }`}
                                 >
                                   {betLogData.is_back_bookmaker === 1
@@ -1504,8 +1509,8 @@ export default function LiveMatch() {
                               // For the other team, show the investment amount with opposite sign
                               <span
                                 className={`text-xl ${betLogData.is_back_bookmaker === 1
-                                    ? "text-red-400"
-                                    : "text-green-400"
+                                  ? "text-red-400"
+                                  : "text-green-400"
                                   }`}
                               >
                                 {betLogData.is_back_bookmaker === 1 ? "-" : "+"}
@@ -1606,8 +1611,8 @@ export default function LiveMatch() {
                               <>
                                 <span
                                   className={`${betLogData.is_back_bookmaker === 1
-                                      ? "text-green-400"
-                                      : "text-red-400"
+                                    ? "text-green-400"
+                                    : "text-red-400"
                                     }`}
                                 >
                                   {betLogData.is_back_bookmaker === 1
@@ -1631,8 +1636,8 @@ export default function LiveMatch() {
                               // For the other team, show the investment amount with opposite sign
                               <span
                                 className={`text-xs ${betLogData.is_back_bookmaker === 1
-                                    ? "text-red-400"
-                                    : "text-green-400"
+                                  ? "text-red-400"
+                                  : "text-green-400"
                                   }`}
                               >
                                 {betLogData.is_back_bookmaker === 1 ? "-" : "+"}
@@ -1764,7 +1769,7 @@ export default function LiveMatch() {
                         return selectionIdA.localeCompare(selectionIdB);
                       })
                       .map((odd, idx) => {
-                        const isSuspended = !odd.back?.price || !odd.lay?.price;
+                        const isSuspended = !odd.back?.price && !odd.lay?.price;
 
                         return (
                           <div
@@ -1787,7 +1792,7 @@ export default function LiveMatch() {
                                 onClick={() =>
                                   !isSuspended && handleFancyBet(odd, "no")
                                 }
-                                disabled={isSuspended}
+                                // disabled={isSuspended}
                                 className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#72bbee] cursor-pointer disabled:opacity-50"
                               >
                                 <span className="text-white font-bold text-lg">
@@ -1802,7 +1807,7 @@ export default function LiveMatch() {
                                 onClick={() =>
                                   !isSuspended && handleFancyBet(odd, "yes")
                                 }
-                                disabled={isSuspended}
+                                // disabled={isSuspended}
                                 className="flex flex-col items-center justify-center rounded p-2 text-center bg-[#ff9393] cursor-pointer disabled:opacity-50"
                               >
                                 <span className="text-white font-bold text-lg">
@@ -1871,12 +1876,14 @@ export default function LiveMatch() {
                           </span>
                           <span
                             className={`font-medium ${calculateReturns()?.isback
-                                ? "text-green-400"
-                                : "text-red-400"
+                              ? "text-green-400"
+                              : "text-red-400"
                               }`}
                           >
                             {calculateReturns()?.isback ? "+" : "-"}₹
-                            {Math.abs(calculateReturns()?.profit || 0).toFixed(
+                            {isBookMarkBet ? Math.abs((calculateReturns()?.profit ?? 0)/100).toFixed(
+                              0
+                            ) : Math.abs(calculateReturns()?.profit ?? 0).toFixed(
                               0
                             )}
                           </span>
@@ -1888,8 +1895,8 @@ export default function LiveMatch() {
                           </span>
                           <span
                             className={`font-medium ${calculateReturns()?.isback
-                                ? "text-red-400"
-                                : "text-green-400"
+                              ? "text-red-400"
+                              : "text-green-400"
                               }`}
                           >
                             {calculateReturns()?.isback ? "-" : "+"}₹
@@ -2048,12 +2055,16 @@ export default function LiveMatch() {
                         </span>
                         <span
                           className={`font-medium ${calculateReturns()?.isback
-                              ? "text-green-400"
-                              : "text-red-400"
+                            ? "text-green-400"
+                            : "text-red-400"
                             }`}
                         >
                           {calculateReturns()?.isback ? "+" : "-"}₹
-                          {Math.abs(calculateReturns()?.profit || 0).toFixed(0)}
+                          {isBookMarkBet ? Math.abs((calculateReturns()?.profit ?? 0)/100).toFixed(
+                            0
+                          ) : Math.abs(calculateReturns()?.profit ?? 0).toFixed(
+                            0
+                          )}
                         </span>
                       </div>
 
@@ -2063,12 +2074,14 @@ export default function LiveMatch() {
                         </span>
                         <span
                           className={`font-medium ${calculateReturns()?.isback
-                              ? "text-red-400"
-                              : "text-green-400"
+                            ? "text-red-400"
+                            : "text-green-400"
                             }`}
                         >
                           {calculateReturns()?.isback ? "-" : "+"}₹
-                          {Math.abs(calculateReturns()?.stake || 0).toFixed(0)}
+                          {Math.abs(calculateReturns()?.stake || 0).toFixed(
+                            0
+                          )}
                         </span>
                       </div>
                     </div>
