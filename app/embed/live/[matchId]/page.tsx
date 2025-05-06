@@ -7,7 +7,7 @@ interface LiveMatchData {
 async function fetchLiveMatchData(matchId: string) {
   try {
     // First fetch score data from tvapp API
-    const response = await fetch("https://tvapp.1ten.live/api/get-all-tv", {
+    const response = await fetch("https://app.livetvapi.com/api/get-all-tv", {
       cache: "no-store",
       next: { revalidate: 0 },
     });
