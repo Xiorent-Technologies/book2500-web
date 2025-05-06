@@ -285,7 +285,7 @@ interface OddsMapping {
 }
 
 interface RealTimeOdds {
-  data?: {
+  event_data?: {
     runners: Array<{
       selectionId: number;
       ex?: {
@@ -427,7 +427,7 @@ export default function LiveMatch() {
   const [cashoutType, setCashoutType] = useState<string>("");
   const [betLogData, setBetLogData] = useState<BetLog | null>(null);
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
-
+  const [isBookMarkBet , serIsBookMark] = useState<boolean>(false)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -472,7 +472,7 @@ export default function LiveMatch() {
 
       try {
         // First fetch the score and TV data mapping
-        const response = await fetch("https://tvapp.1ten.live/api/get-all-tv", {
+        const response = await fetch("https://app.livetvapi.com/api/get-all-tv", {
           cache: "no-store",
         });
         const data: LiveMatchData[] = await response.json();
@@ -519,7 +519,6 @@ export default function LiveMatch() {
         );
 
         const data = await response.json();
-
         // if (data.data) {
         // Create a mapping of SelectionId to prediction data
         const oddsMapping: OddsMapping = {};
@@ -560,14 +559,13 @@ export default function LiveMatch() {
 
     try {
       const response = await fetch(
-        `https://test.book2500.in/fetch-event-odds/${eventId}/${marketId}`
+        `https://test.book2500.in/api/bet/insert-question/${eventId}/${marketId}`
       );
       const data: RealTimeOdds = await response.json();
-
-      if (data?.data?.runners) {
+      if (data?.event_data?.runners) {
         setEventOdds((prev) => {
           const updatedRunners = prev.runners.map((runner) => {
-            const realtimeRunner = data.data?.runners?.find(
+            const realtimeRunner = data?.event_data?.runners?.find(
               (r) => String(r.selectionId) === String(runner.selectionId)
             );
 
@@ -628,7 +626,6 @@ export default function LiveMatch() {
         );
 
         const data = await response.json();
-
         // Add null check and default to empty array if data.data is undefined
         if (data && Array.isArray(data.data)) {
           // Group odds by RunnerName
@@ -675,7 +672,6 @@ export default function LiveMatch() {
             },
             {}
           );
-
           setFancyOddsMappings(Object.values(groupedOdds));
         } else {
           console.warn("No fancy odds data available or invalid format");
@@ -697,7 +693,7 @@ export default function LiveMatch() {
 
     try {
       const response = await fetch(
-        `https://test.book2500.in/fetch-fancy-odds/${eventId}/${marketId}`
+        `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
       );
       const data = await response.json();
       
@@ -788,10 +784,9 @@ export default function LiveMatch() {
 
     try {
       const response = await fetch(
-        `https://test.book2500.in/fetch-bookmaker-odds/${eventId}/${marketId}`
+        `https://test.book2500.in/api/v2/bm/get-bookmaker-odds-redis-cache/${eventId}/${marketId}`
       );
       const data = await response.json();
-      console.log('data',data)
       if (data?.data) {
         setBookmakerMarket(data.data);
         // console.log(data.data);
@@ -910,15 +905,18 @@ export default function LiveMatch() {
         return;
       }
 
+      // Convert stake amount from rupees to paisa
+      const stakeInPaisa = isBookMarkBet ? stakeAmount / 100 : stakeAmount;
+
       const requestBody: any = {
         SelectionId: String(selectedBet.selectionId) || "",
-        selection_id: String(selectedBet.selectionId) || "", // Add this line
+        selection_id: String(selectedBet.selectionId) || "",
         RunnerName: selectedBet.name,
         Option_name: selectedBet.name,
         Option_id: selectedBet.betoption_id,
         Question_id: selectedBet.betquestion_id,
         Match_id: selectedBet.match_id,
-        invest_amount: stakeAmount,
+        invest_amount: stakeInPaisa,
         betoption_id: selectedBet.betoption_id,
         betquestion_id: selectedBet.betquestion_id,
         match_id: selectedBet.match_id,
@@ -1014,7 +1012,7 @@ export default function LiveMatch() {
     index: number = 0 // Add index parameter
   ) => {
     setBetError(null);
-
+    serIsBookMark(false)
     try {
       let isSuspended = false;
       let oddsValue = "";
@@ -1077,7 +1075,7 @@ export default function LiveMatch() {
   const handleFancyBet = (odd: GroupedFancyOdd, type: "no" | "yes") => {
     const option = type === "no" ? odd.back : odd.lay;
     if (!option) return;
-
+    serIsBookMark(false)
     setSelectedBet({
       name: odd.RunnerName,
       type: type.toUpperCase(),
@@ -1102,7 +1100,7 @@ export default function LiveMatch() {
     index: number = 0 // Add index parameter
   ) => {
     if (runner.status === "SUSPENDED") return;
-
+    serIsBookMark(true)
     const odds =
       type === "back"
         ? runner.back?.[index]?.price // Use index parameter
@@ -1167,119 +1165,22 @@ export default function LiveMatch() {
 
   const processCashout = async () => {
     setShowCashoutDialog(false);
-    toast.loading("Processing cashout...");
+    toast.error("Cashout feature is not available at the moment.", {
+      duration: 3000,
+    });
+    // toast.loading("Processing cashout...");
 
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const matchId = urlParams.get("match");
-      const marketId = urlParams.get("market");
-      const token = localStorage.getItem("auth_token");
+    // try {
+    //   const urlParams = new URLSearchParams(window.location.search);
+    //   const matchId = urlParams.get("match");
+    //   const marketId = urlParams.get("market");
+    //   const token = localStorage.getItem("auth_token");
 
-      if (!matchId || !marketId || !token) {
-        toast.dismiss();
-        toast.error("Missing match, market, or auth token");
-        return;
+    //   if (!matchId || !marketId || !token) {
+    //     toast.dismiss();
+    //     toast.error("Missing match, market, or auth token");
+    //     return;
       }
-
-      const [betRes, oddsRes] = await Promise.all([
-        fetch("https://book2500.funzip.in/api/bet-log", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(
-          `https://test.book2500.in/fetch-event-odds/${matchId}/${marketId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        ),
-      ]);
-
-      if (!betRes.ok || !oddsRes.ok) {
-        throw new Error("Failed to fetch bet logs or odds");
-      }
-
-      const betData = await betRes.json();
-      const oddsData = (await oddsRes.json())?.data;
-
-      const matchKey =
-        cashoutType === "match-odds"
-          ? "matchid_matchodds"
-          : "matchid_bookmaker";
-      const matchKeyValue = betData[matchKey]?.toString();
-
-      const pendingBets = (betData.logs || []).filter(
-        (log: BetLogEntry) =>
-          log.match_id === matchKeyValue &&
-          log.is_cashed_out === 0 &&
-          log.status === "0"
-      );
-
-      if (pendingBets.length === 0) {
-        toast.dismiss();
-        toast.error("No pending bets found for cashout");
-        return;
-      }
-
-      const latestBet = pendingBets[0];
-      const selectionId = latestBet.selection_id?.toString();
-      const level = latestBet.level?.toString() || "0";
-      const isBack = latestBet.is_back === 1;
-
-      const runners = oddsData?.runners as any[];
-      if (!runners || runners.length < 2) {
-        toast.dismiss();
-        toast.error("Runner data is incomplete or missing");
-        return;
-      }
-
-      const selectedRunner = runners.find(
-        (r: any) => r.selectionId?.toString() === selectionId
-      );
-      const oppositeRunner = runners.find(
-        (r: any) => r.selectionId?.toString() !== selectionId
-      );
-
-      if (!selectedRunner || !oppositeRunner) {
-        toast.dismiss();
-        toast.error("Could not find selected or opposite runner");
-        return;
-      }
-
-      const selPrices = isBack ? selectedRunner.back : selectedRunner.lay;
-      const oppPrices = isBack ? oppositeRunner.back : oppositeRunner.lay;
-
-      const selPrice = selPrices.find((p: RunnerPrice) => p.level?.toString() === level);
-      const oppPrice = oppPrices.find((p: RunnerPrice) => p.level?.toString() === level);
-
-      const base0 = selPrice?.price ? parseFloat(selPrice.price) : 1.5;
-      const base1 = oppPrice?.price ? parseFloat(oppPrice.price) : 91;
-
-      const cashoutData: CashoutData = {
-        bet_invest_id: Number(latestBet.id),
-        base0: base0.toString(),
-        base1: base1.toString(),
-      };
-
-      const result = await executeCashout(cashoutData as any);
-      toast.dismiss();
-
-      if (result.success) {
-        const pollingInterval = setInterval(async () => {
-          fetchBetLog();
-          clearInterval(pollingInterval);
-          toast.success("Cashout successful", {
-            description: `Refund: ₹${result.refund_amount?.toFixed(2) || "0.00"}`,
-          });
-          updateBalanceFromAPI();
-        }, 3000);
-      } else {
-        toast.error("Cashout failed", { description: result.message });
-      }
-    } catch (error) {
-      console.error("Cashout error:", error);
-      toast.dismiss();
-      toast.error("Cashout process encountered an error");
-    }
-  };
 
   const handleCashoutClick = useCallback(
     (e: React.MouseEvent, type: string) => {
@@ -1381,7 +1282,7 @@ export default function LiveMatch() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={(e) => handleCashoutClick(e, "match-odds")}
+                    onClick={processCashout}
                     className="bg-green-600 text-white text-xs px-2 py-1 rounded"
                   >
                     CASHOUT
@@ -1403,9 +1304,8 @@ export default function LiveMatch() {
                         runner.ex?.availableToBack?.[index]?.price ?? 0;
                       const layOdds =
                         runner.ex?.availableToLay?.[index]?.price ?? 0;
-                      return backOdds <= 0 || layOdds <= 0;
+                      return backOdds <= 0 && layOdds <= 0;
                     });
-
                     return (
                       <div key={idx} className="border-b border-purple-900">
                         {/* Update the match odds display logic */}
@@ -1557,7 +1457,7 @@ export default function LiveMatch() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={(e) => handleCashoutClick(e, "bookmaker-odds")}
+                    onClick={processCashout}
                     className="bg-green-600 text-white text-xs px-2 py-1 rounded"
                   >
                     CASHOUT

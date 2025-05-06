@@ -33,6 +33,18 @@ interface DepositResponse {
   success: boolean;
 }
 
+interface UserData {
+  name: string;
+  email: string;
+  mobile: string;
+  balance: string;
+  referral_token: string;
+  image_url: string;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+}
+
 export default function DepositPage() {
   const router = useRouter();
   const [gateways, setGateways] = useState<Gateway[]>([]);
@@ -43,11 +55,14 @@ export default function DepositPage() {
   const [receiptImage, setReceiptImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   const fetchGateways = useCallback(async () => {
     try {
       const token = localStorage.getItem("auth_token");
-      if (!token) {
+      const storedUserData = localStorage.getItem("user_data");
+      
+      if (!token || !storedUserData) {
         toast.error("Please login to continue");
         router.push("/login");
         return;
@@ -60,6 +75,9 @@ export default function DepositPage() {
         },
       });
 
+      const parsedUserData: UserData = JSON.parse(storedUserData);
+      setUserData(parsedUserData);
+
       const data: DepositResponse = await response.json();
 
       if (data.success) {
@@ -69,6 +87,7 @@ export default function DepositPage() {
       }
     } catch (error) {
       console.error("Error fetching gateways:", error);
+      toast.error("Failed to load payment gateways");
     } finally {
       setLoading(false);
     }
@@ -155,19 +174,13 @@ export default function DepositPage() {
 
       // Create form data
       const formData = new FormData();
-      formData.append("gateway_id", selectedGateway?.toString() || "99");
+      formData.append("gateway_id", selectedGateway.toString());
       formData.append("amount", amount);
 
       // Only append image if one is selected
       if (receiptImage) {
         formData.append("receipt_image", receiptImage);
       }
-
-      console.log("Sending deposit data:", {
-        amount,
-        gateway_id: selectedGateway || "99",
-        has_receipt: !!receiptImage,
-      });
 
       const response = await fetch(
         "https://book2500.funzip.in/api/deposit-callback",
@@ -264,6 +277,9 @@ export default function DepositPage() {
                                   UPI ID: {gateway.account_detais}
                                 </div>
                               )}
+                              <div className="text-xs text-gray-400 mt-1">
+                                Mobile: {userData?.mobile}
+                              </div>
                             </div>
                           </div>
                         </CardContent>

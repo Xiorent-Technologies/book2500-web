@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Menu, X, User, LogOut } from "lucide-react"
+import { Menu, X, User, LogOut, Wallet } from "lucide-react"
 
 
 // Mock auth context for demonstration
@@ -91,6 +91,11 @@ function Header() {
                     {isAuthenticated ? (
                         <>
                             <div className="hidden sm:flex items-center gap-2 text-gray-200">{/* Balance would go here */}</div>
+                            <Link href="/deposit">
+                                <Button variant="ghost" size="icon" className="bg-[#4c2a70] text-white">
+                                    <Wallet className="h-5 w-5" />
+                                </Button>
+                            </Link>
                             <Link href="/profile">
                                 <Button variant="ghost" size="icon" className="bg-[#4c2a70] text-white">
                                     <User className="h-5 w-5" />

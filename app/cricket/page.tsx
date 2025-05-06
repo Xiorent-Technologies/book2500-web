@@ -195,7 +195,7 @@ export default function CricketPage() {
                                                 <div className="ml-4 flex-grow">
                                                     <div className="flex flex-col">
                                                         <span className="font-bold text-sm sm:text-base text-white">
-                                                            {leader.user.name}
+                                                            {leader?.user?.name}
                                                         </span>
                                                         <span className="text-xs sm:text-sm text-gray-400">
                                                             Deposited: ₹{Number.parseFloat(leader.investAmount).toLocaleString()}

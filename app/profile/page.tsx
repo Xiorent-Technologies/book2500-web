@@ -6,6 +6,7 @@ import Image from "next/image";
 import ProfileSidebar from "@/components/shared/ProfileSidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { updateBalanceFromAPI } from "@/lib/utils";
 
 interface UserData {
   name: string;
@@ -36,6 +37,23 @@ export default function ProfilePage() {
 
     setUserData(JSON.parse(storedUserData));
     setLoading(false);
+
+    // Set up balance update interval
+    const balanceInterval = setInterval(async () => {
+      try {
+        const newBalance = await updateBalanceFromAPI();
+        if (newBalance) {
+          setUserData((prev) => {
+            if (!prev) return null;
+            return { ...prev, balance: newBalance };
+          });
+        }
+      } catch (error) {
+        console.error("Error updating balance:", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(balanceInterval);
   }, [router]);
 
   return (
