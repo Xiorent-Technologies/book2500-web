@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -204,10 +205,10 @@ export function MatchList() {
                 </div>
               ) : (
                 (() => {
-                  const odds = getFormattedOdds(match.odds.runners);
+                  const odds : any= getFormattedOdds(match.odds.runners);
                   if (!odds) return null;
 
-                  const isSuspended = Object.values(odds).every((odd) => odd === "-");
+                  const isSuspended = Object.values(odds).every((odd:any) => odd === "-");
 
                   return (
                     <div
