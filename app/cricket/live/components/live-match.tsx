@@ -428,6 +428,7 @@ export default function LiveMatch() {
   const [betLogData, setBetLogData] = useState<BetLog | null>(null);
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
+  // console.log('bookmakerMarketbookmakerMarket',bookmakerMarket)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -687,11 +688,11 @@ export default function LiveMatch() {
         }
       );
       const data = await response.json();
-console.log('==================',data)
+      console.log('==================', data)
       if (data?.data) {
         setFancyOddsMappings((prev) => {
           const newMappings = prev.map((mapping) => {
-            console.log('mapping',mapping)
+            console.log('mapping', mapping)
             const runner = data.data.find(
               (r: { RunnerName: string; BackPrice1: number; BackSize1: number; LayPrice1: number; LaySize1: number; isSuspended: boolean }) =>
                 r.RunnerName === mapping.RunnerName
@@ -833,6 +834,7 @@ console.log('==================',data)
       });
 
       const data = await response.json();
+      console.log('data++++++++++++++', data)
       if (data.success) {
         setBetLogData(data);
       }
@@ -899,7 +901,6 @@ console.log('==================',data)
 
       // Convert stake amount from rupees to paisa
       const stakeInPaisa = isBookMarkBet ? stakeAmount / 100 : stakeAmount;
-
       const requestBody: any = {
         SelectionId: String(selectedBet.selectionId) || "",
         selection_id: String(selectedBet.selectionId) || "",
@@ -908,11 +909,11 @@ console.log('==================',data)
         Option_id: selectedBet.betoption_id,
         Question_id: selectedBet.betquestion_id,
         Match_id: selectedBet.match_id,
-        invest_amount: stakeInPaisa,
+        invest_amount: stakeAmount,
         betoption_id: selectedBet.betoption_id,
         betquestion_id: selectedBet.betquestion_id,
         match_id: selectedBet.match_id,
-        ratio: selectedOdds,
+        ratio: isBookMarkBet ? String((Number(selectedOdds) / 100 + 1).toFixed(2)) : selectedOdds,
         isback: selectedBet.type.toLowerCase() === "back" || selectedBet.type.toLowerCase() === "no" ? 1 : 0,
         level: 1
       };
@@ -1136,8 +1137,12 @@ console.log('==================',data)
     const odds = Number(selectedOdds);
 
     if (isNaN(stake) || isNaN(odds)) return null;
-
-    const profit = stake * odds - stake;
+    let profit = 0;
+    if (isBookMarkBet) {
+      profit = (odds / 100) * stake;
+    } else {
+      profit = odds - 1 * stake;
+    }
     const potentialReturn = stake + profit;
 
     const otherTeam =
@@ -1153,7 +1158,7 @@ console.log('==================',data)
       otherTeam,
       isback: selectedBet?.type === "BACK",
     };
-  }, [selectedOdds, selectedStake, selectedBet, eventOdds.runners]);
+  }, [selectedOdds, selectedStake, isBookMarkBet, eventOdds.runners, selectedBet?.name, selectedBet?.type]);
 
   const processCashout = async () => {
     setShowCashoutDialog(false);
@@ -1881,7 +1886,7 @@ console.log('==================',data)
                               }`}
                           >
                             {calculateReturns()?.isback ? "+" : "-"}₹
-                            {isBookMarkBet ? Math.abs((calculateReturns()?.profit ?? 0)/100).toFixed(
+                            {isBookMarkBet ? Math.abs(calculateReturns()?.profit ?? 0).toFixed(
                               0
                             ) : Math.abs(calculateReturns()?.profit ?? 0).toFixed(
                               0
@@ -2060,11 +2065,7 @@ console.log('==================',data)
                             }`}
                         >
                           {calculateReturns()?.isback ? "+" : "-"}₹
-                          {isBookMarkBet ? Math.abs((calculateReturns()?.profit ?? 0)/100).toFixed(
-                            0
-                          ) : Math.abs(calculateReturns()?.profit ?? 0).toFixed(
-                            0
-                          )}
+                          {Math.abs(calculateReturns()?.profit ?? 0).toFixed(0)}
                         </span>
                       </div>
 
