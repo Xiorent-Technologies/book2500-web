@@ -432,6 +432,8 @@ export default function LiveMatch() {
   const [betLogData, setBetLogData] = useState<BetLog | null>(null);
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
+  const [newBetlog, setNewBetlog] = useState<any>([])
+console.log('------>0',newBetlog)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -469,6 +471,38 @@ export default function LiveMatch() {
 
     return () => clearInterval(balanceInterval);
   }, []);
+
+  const fetchcalculation = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      if (!token) {
+        toast.error("Please login to continue");
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch("https://book2500.funzip.in/api/bet-cal", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setNewBetlog(data)
+      } else {
+        toast.error("Failed to load bet history");
+      }
+    } catch (error) {
+      console.error("Error fetching bet history:", error);
+      // setBets([]);
+    } finally {
+      // setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => { fetchcalculation() }, [fetchcalculation])
 
   useEffect(() => {
     const fetchLiveMatchData = async () => {
@@ -958,6 +992,7 @@ export default function LiveMatch() {
       });
 
       await fetchBetLog();
+      await fetchcalculation();
 
       const newBalance = (userBalanceNum - stakeAmount).toString();
       if (typeof window !== "undefined") {
@@ -1294,111 +1329,132 @@ export default function LiveMatch() {
 
               {expandedSections.matchOdds && (
                 <div className="p-0">
-                  {eventOdds.runners
-                    ?.slice() // Create a shallow copy to avoid mutating original
-                    .sort((a: any, b: any) => Number(a.selectionId) - Number(b.selectionId))
-                    .map((runner: any, idx) => {
-                      const isSuspended = [0, 1, 2].some((index) => {
-                        const backOdds = runner.ex?.availableToBack?.[index]?.price ?? 0;
-                        const layOdds = runner.ex?.availableToLay?.[index]?.price ?? 0;
-                        return backOdds <= 0 && layOdds <= 0;
-                      });
-                      return (
-                        <div key={idx} className="border-b border-purple-900">
-                          {/* Update the match odds display logic */}
-                          <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
-                            <span>{runner.runner}</span>
-                            <div className="flex flex-col items-end mr-4">
-                              <span
-                                className={`${Number(
-                                  idx === 0 ? betLogData?.mo_option_1
-                                    : betLogData?.mo_option_2
+                  {eventOdds.runners?.map((runner: any, idx) => {
+                    const isSuspended = [0, 1, 2].some((index) => {
+                      const backOdds =
+                        runner.ex?.availableToBack?.[index]?.price ?? 0;
+                      const layOdds =
+                        runner.ex?.availableToLay?.[index]?.price ?? 0;
+                      return backOdds <= 0 && layOdds <= 0;
+                    });
+                    return (
+                      <div key={idx} className="border-b border-purple-900">
+                        {/* Update the match odds display logic */}
+                        <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
+                          <span>{runner.runner}</span>
+                          {/* Find the corresponding bet log entry for the current match */}
+                          {newBetlog.matches && (
+                            () => {
+                              const currentMatchBetLog = newBetlog.matches.find(
+                                (log: any) => String(log.match_id) === runner.Match_id
+                              );
 
-                                ) >= 0
-                                  ? "text-green-400"
-                                  : "text-red-400"
-                                  }`}
-                              >
-                                {Number(
-                                  idx === 0 ? betLogData?.mo_option_1
-                                    : betLogData?.mo_option_2
+                              if (currentMatchBetLog) {
+                                let optionValue = null;
+                                if (String(runner.selectionId) === currentMatchBetLog.selection_id_1) {
+                                  optionValue = Number(currentMatchBetLog.mo_option_1);
+                                } else if (String(runner.selectionId) === currentMatchBetLog.selection_id_2) {
+                                  optionValue = Number(currentMatchBetLog.mo_option_2);
+                                }
 
-                                ) >= 0
-                                  ? "+"
-                                  : "-"}₹
-                                {Math.abs(
-                                  Number(
-                                    idx === 0 ? betLogData?.mo_option_1
-                                      : betLogData?.mo_option_2
-
-                                  )
-                                )}
+                                // Display mo_option value if available and not zero
+                                if (optionValue !== null && optionValue !== 0) {
+                                  return (
+                                    <div className="flex flex-col items-end mr-4">
+                                      <span
+                                        className={`${optionValue > 0
+                                          ? "text-green-400"
+                                          : "text-red-400"
+                                          }`}
+                                      >
+                                        {optionValue > 0 ? "+" : "-"}
+                                        ₹{Math.abs(optionValue)}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                              }
+                              return null;
+                            }
+                          )()}
+                        </div>
+                        <div className="grid grid-cols-6 w-full relative">
+                          {isSuspended && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                              <span className="text-red-500 font-bold text-lg">
+                                SUSPENDED
                               </span>
                             </div>
+                          )}
+                          {[2, 1, 0].map((i) => {
+                            const odds =
+                              runner.ex?.availableToBack?.[i]?.price || 0;
+                            const size =
+                              runner.ex?.availableToBack?.[i]?.size || 0;
+                            const isAvailable = odds > 0 && !isSuspended;
 
-                          </div>
-
-                          <div className="grid grid-cols-6 w-full relative">
-                            {isSuspended && (
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                                <span className="text-red-500 font-bold text-lg">
-                                  SUSPENDED
-                                </span>
+                            return (
+                              <div
+                                key={`back-${i}`}
+                                onClick={
+                                  () =>
+                                    isAvailable &&
+                                    handleOddsClick(runner, "back", "match", i) // Pass index i
+                                }
+                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
+                                  } ${i === 0
+                                    ? "bg-[#72bbee]"
+                                    : i === 1
+                                      ? "bg-[#72bbee] "
+                                      : "bg-[#72bbee] "
+                                  }`}
+                              >
+                                <div className="text-white font-bold">
+                                  {odds > 0 ? odds.toFixed(2) : "0.0"}
+                                </div>
+                                <div className="text-xs text-gray-200">
+                                  {size > 0 ? size.toLocaleString() : "0.0"}
+                                </div>
                               </div>
-                            )}
+                            );
+                          })}
 
-                            {[2, 1, 0].map((i) => {
-                              const odds = runner.ex?.availableToBack?.[i]?.price || 0;
-                              const size = runner.ex?.availableToBack?.[i]?.size || 0;
-                              const isAvailable = odds > 0 && !isSuspended;
+                          {[0, 1, 2].map((i) => {
+                            const odds =
+                              runner.ex?.availableToLay?.[i]?.price || 0;
+                            const size =
+                              runner.ex?.availableToLay?.[i]?.size || 0;
+                            const isAvailable = odds > 0 && !isSuspended;
 
-                              return (
-                                <div
-                                  key={`back-${i}`}
-                                  onClick={() =>
-                                    isAvailable && handleOddsClick(runner, "back", "match", i)
-                                  }
-                                  className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
-                                    } bg-[#72bbee]`}
-                                >
-                                  <div className="text-white font-bold">
-                                    {odds > 0 ? odds.toFixed(2) : "0.0"}
-                                  </div>
-                                  <div className="text-xs text-gray-200">
-                                    {size > 0 ? size.toLocaleString() : "0.0"}
-                                  </div>
+                            return (
+                              <div
+                                key={`lay-${i}`}
+                                onClick={
+                                  () =>
+                                    isAvailable &&
+                                    handleOddsClick(runner, "lay", "match", i) // Pass index i
+                                }
+                                className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
+                                  } ${i === 0
+                                    ? "bg-[#ff9393]"
+                                    : i === 1
+                                      ? "bg-[#ff9393] "
+                                      : "bg-[#ff9393]"
+                                  }`}
+                              >
+                                <div className="text-white font-bold">
+                                  {odds > 0 ? odds.toFixed(2) : "0.0"}
                                 </div>
-                              );
-                            })}
-
-                            {[0, 1, 2].map((i) => {
-                              const odds = runner.ex?.availableToLay?.[i]?.price || 0;
-                              const size = runner.ex?.availableToLay?.[i]?.size || 0;
-                              const isAvailable = odds > 0 && !isSuspended;
-
-                              return (
-                                <div
-                                  key={`lay-${i}`}
-                                  onClick={() =>
-                                    isAvailable && handleOddsClick(runner, "lay", "match", i)
-                                  }
-                                  className={`flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 ${isAvailable ? "cursor-pointer" : "opacity-90"
-                                    } bg-[#ff9393]`}
-                                >
-                                  <div className="text-white font-bold">
-                                    {odds > 0 ? odds.toFixed(2) : "0.0"}
-                                  </div>
-                                  <div className="text-xs text-gray-200">
-                                    {size > 0 ? size.toLocaleString() : "0.0"}
-                                  </div>
+                                <div className="text-xs text-gray-200">
+                                  {size > 0 ? size.toLocaleString() : "0.0"}
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-
-                    })}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -2130,4 +2186,4 @@ export default function LiveMatch() {
       />
     </div>
   );
-}
+}   
