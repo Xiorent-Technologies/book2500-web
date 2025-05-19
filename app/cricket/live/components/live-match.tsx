@@ -674,7 +674,6 @@ export default function LiveMatch() {
           `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
         );
         const dataJson = await dataRes.json();
-console.log('dataJson',dataJson)
         if (!Array.isArray(dataJson?.data)) {
           setFancyOddsMappings([]);
           return;
@@ -684,7 +683,6 @@ console.log('dataJson',dataJson)
         const merged = dataJson.data.map((item: any) => {
           const runnerKey = item.runnerName;
           const fancyInfo = fancyMap[runnerKey];
-
           return {
             RunnerName: runnerKey,
             Match_id: fancyInfo?.Match_id || "",
@@ -692,7 +690,7 @@ console.log('dataJson',dataJson)
             back: {
               Option_id: fancyInfo?.Option_id || 0,
               Option_name: "back",
-              SelectionId: String(fancyInfo?.Option_id || ""), // fallback if needed
+              SelectionId: String(item?.selectionId || ""), // fallback if needed
               min: String(item.minAmount || "100"),
               max: String(item.maxAmount || "50000"),
               price: item.BackPrice1 || 0,
@@ -701,7 +699,7 @@ console.log('dataJson',dataJson)
             lay: {
               Option_id: fancyInfo?.Option_id || 0,
               Option_name: "lay",
-              SelectionId: String(fancyInfo?.Option_id || ""), // fallback if needed
+              SelectionId: String(item?.selectionId || ""), // fallback if needed
               min: String(item.minAmount || "100"),
               max: String(item.maxAmount || "50000"),
               price: item.LayPrice1 || 0,
@@ -1115,7 +1113,6 @@ console.log('dataJson',dataJson)
 
   const handleFancyBet = (odd: GroupedFancyOdd, type: "no" | "yes") => {
     const option = type === "no" ? odd.back : odd.lay;
-    console.log('-------', type)
     if (!option) return;
     serIsBookMark(false)
     setSelectedBet({
