@@ -434,6 +434,7 @@ export default function LiveMatch() {
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
   const [newBetlog, setNewBetlog] = useState<any>([])
+  console.log('bookmakerMarket',bookmakerMappings)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -1512,7 +1513,7 @@ export default function LiveMatch() {
                           {/* Display option_1 value if available and not zero */}
                           {(() => {
                             const currentMatchBetLog = newBetlog.matches.find(
-                              (log: any) => String(log.match_id) === String(eventOdds.runners[0].Match_id)
+                              (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                             );
 
                             if (currentMatchBetLog && currentMatchBetLog.option_1 !== null && currentMatchBetLog.option_1 !== 0) {
@@ -1612,7 +1613,7 @@ export default function LiveMatch() {
                           {/* Display mo_option value if available and not zero */}
                           {(() => {
                             const currentMatchBetLog = newBetlog.matches.find(
-                              (log: any) => String(log.match_id) === String(eventOdds.runners[0].Match_id)
+                              (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                             );
 
                             if (currentMatchBetLog && currentMatchBetLog.option_2 !== null && currentMatchBetLog.option_2 !== 0) {
