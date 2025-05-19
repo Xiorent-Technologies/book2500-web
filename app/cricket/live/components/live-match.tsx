@@ -137,6 +137,7 @@ interface FancyOddsMapping {
   RunnerName: string;
   Match_id: string;
   Question_id: number;
+  rem:string;
   back?: {
     Option_id: number;
     Option_name: string;
@@ -434,7 +435,6 @@ export default function LiveMatch() {
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
   const [newBetlog, setNewBetlog] = useState<any>([])
-  // console.log('bookmakerMarket', fancyOddsMappings)
   // console.log('newBetlog',newBetlog)
   useEffect(() => {
     if (isBrowser) {
@@ -674,6 +674,7 @@ export default function LiveMatch() {
           `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
         );
         const dataJson = await dataRes.json();
+        console.log('dataJson', dataJson)
         if (!Array.isArray(dataJson?.data)) {
           setFancyOddsMappings([]);
           return;
@@ -687,6 +688,7 @@ export default function LiveMatch() {
             RunnerName: runnerKey,
             Match_id: fancyInfo?.Match_id || "",
             Question_id: fancyInfo?.Question_id || 0,
+            rem: item.rem,
             back: {
               Option_id: fancyInfo?.Option_id || 0,
               Option_name: "back",
@@ -1147,7 +1149,6 @@ export default function LiveMatch() {
         : runner.lay?.[index]?.price; // Use index parameter
 
     if (!odds) return;
-
     // Find the matching mapping for this runner
     const mapping = bookmakerMappings.find(
       (m) => m.SelectionId === runner.selectionId.toString()
@@ -1582,7 +1583,7 @@ export default function LiveMatch() {
                             key={`lay-${i}`}
                             onClick={() =>
                               bookmakerMarket.runners[0].status === "ACTIVE" &&
-                              handleBookmakerBet(bookmakerMarket.runners[0], "lay", i)
+                              handleBookmakerBet(bookmakerMarket.runners[1], "lay", i)
                             }
                             className="flex flex-col items-center justify-center rounded p-2 text-center mr-2 mb-2 bg-[#ff9393] cursor-pointer"
                           >
@@ -1768,7 +1769,8 @@ export default function LiveMatch() {
                         return selectionIdA.localeCompare(selectionIdB);
                       })
                       .map((odd, idx) => {
-                        const isSuspended = !odd.back?.price && !odd.lay?.price;
+                        const hasRem = odd.rem && odd.rem !== "";
+                        const isSuspended = !hasRem && !odd.back?.price && !odd.lay?.price;
 
                         return (
                           <div
@@ -1779,13 +1781,15 @@ export default function LiveMatch() {
                               {odd.RunnerName}
                             </div>
                             <div className="grid grid-cols-2 gap-2 p-2 relative">
-                              {isSuspended && (
-                                <div className="absolute inset-0  flex items-center justify-center z-10">
-                                  <span className="text-red-500 font-bold text-lg">
-                                    SUSPENDED
-                                  </span>
+                              {hasRem ? (
+                                <div className="absolute inset-0 flex items-center justify-center z-10">
+                                  <span className="text-yellow-400 font-bold text-lg">{odd.rem}</span>
                                 </div>
-                              )}
+                              ) : isSuspended ? (
+                                <div className="absolute inset-0 flex items-center justify-center z-10">
+                                  <span className="text-red-500 font-bold text-lg">SUSPENDED</span>
+                                </div>
+                              ) : null}
                               {/* NO button */}
                               <button
                                 onClick={() =>
