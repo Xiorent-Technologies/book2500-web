@@ -434,7 +434,8 @@ export default function LiveMatch() {
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
   const [newBetlog, setNewBetlog] = useState<any>([])
-  console.log('bookmakerMarket',bookmakerMappings)
+  // console.log('bookmakerMarket', fancyOddsMappings)
+  // console.log('newBetlog',newBetlog)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -645,138 +646,151 @@ export default function LiveMatch() {
   }, [fetchOddsData]);
 
   useEffect(() => {
-    const fetchInitialFancyOdds = async () => {
+    const fetchAndMergeFancyOdds = async () => {
       if (!eventId || !marketId) return;
 
       try {
-        const response = await fetch(
+        // 1. Fetch Match_id + Option_id + Question_id from fancy-odds
+        const fancyRes = await fetch(`https://book2500.funzip.in/api/fancy-odds`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, market_id: marketId }),
+        });
+
+        const fancyJson = await fancyRes.json();
+        const fancyMap = Array.isArray(fancyJson?.data)
+          ? fancyJson.data.reduce((acc: any, item: any) => {
+            acc[item.RunnerName] = {
+              Match_id: item.Match_id,
+              Option_id: item.Option_id,
+              Question_id: item.Question_id,
+            };
+            return acc;
+          }, {})
+          : {};
+
+        // 2. Fetch UI-render data from retrieve API
+        const dataRes = await fetch(
           `https://test.book2500.in/api/book/retrieve/${eventId}/${marketId}`
         );
-        const data = await response.json();
-        if (data && Array.isArray(data.data)) {
-          // Group odds by RunnerName
-          const groupedOdds = data.data.reduce(
-            (
-              acc: { [key: string]: any },
-              curr: any
-            ) => {
-              // if (!curr || !curr.runnerName || !curr.SelectionId) {
-              //   return acc;
-              // }
-
-              const key = `${curr.SelectionId}-${curr.runnerName}`;
-
-              if (!acc[key]) {
-                acc[key] = {
-                  RunnerName: curr.runnerName,
-                  Match_id: eventId,
-                  Question_id: Number(curr.SelectionId),
-                  back: {
-                    Option_id: Number(curr.SelectionId),
-                    Option_name: 'back',
-                    SelectionId: curr.SelectionId,
-                    min: String(curr.minAmount || '100'),
-                    max: String(curr.maxAmount || '50000'),
-                    price: curr.BackPrice1 || 0,
-                    size: 0,
-                  },
-                  lay: {
-                    Option_id: Number(curr.SelectionId),
-                    Option_name: 'lay',
-                    SelectionId: curr.SelectionId,
-                    min: String(curr.minAmount || '100'),
-                    max: String(curr.maxAmount || '50000'),
-                    price: curr.LayPrice1 || 0,
-                    size: 0,
-                  }
-                };
-              }
-
-              return acc;
-            },
-            {}
-          );
-          setFancyOddsMappings(Object.values(groupedOdds));
-        } else {
-          console.warn("No fancy odds data available or invalid format");
+        const dataJson = await dataRes.json();
+console.log('dataJson',dataJson)
+        if (!Array.isArray(dataJson?.data)) {
           setFancyOddsMappings([]);
+          return;
         }
+
+        // 3. Merge data from both APIs by RunnerName
+        const merged = dataJson.data.map((item: any) => {
+          const runnerKey = item.runnerName;
+          const fancyInfo = fancyMap[runnerKey];
+
+          return {
+            RunnerName: runnerKey,
+            Match_id: fancyInfo?.Match_id || "",
+            Question_id: fancyInfo?.Question_id || 0,
+            back: {
+              Option_id: fancyInfo?.Option_id || 0,
+              Option_name: "back",
+              SelectionId: String(fancyInfo?.Option_id || ""), // fallback if needed
+              min: String(item.minAmount || "100"),
+              max: String(item.maxAmount || "50000"),
+              price: item.BackPrice1 || 0,
+              size: 0,
+            },
+            lay: {
+              Option_id: fancyInfo?.Option_id || 0,
+              Option_name: "lay",
+              SelectionId: String(fancyInfo?.Option_id || ""), // fallback if needed
+              min: String(item.minAmount || "100"),
+              max: String(item.maxAmount || "50000"),
+              price: item.LayPrice1 || 0,
+              size: 0,
+            },
+          };
+        });
+
+        setFancyOddsMappings(merged);
       } catch (error) {
-        console.error("Error fetching fancy odds:", error);
+        console.error("Error fetching fancy odds data:", error);
         setFancyOddsMappings([]);
       }
     };
 
-    fetchInitialFancyOdds();
-    const interval = setInterval(fetchInitialFancyOdds, 1500);
+    fetchAndMergeFancyOdds();
+    const interval = setInterval(fetchAndMergeFancyOdds, 2000);
+
     return () => clearInterval(interval);
   }, [eventId, marketId]);
 
-  const updateFancyOdds = useCallback(async () => {
-    if (!eventId || !marketId) return;
 
-    try {
-      const response = await fetch(
-        `https://book2500.funzip.in/api/fancy-odds`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event_id: eventId, market_id: marketId }),
-        }
-      );
-      const data = await response.json();
-      if (data?.data) {
-        setFancyOddsMappings((prev) => {
-          const newMappings = prev.map((mapping) => {
-            const runner = data.data.find(
-              (r: { RunnerName: string; BackPrice1: number; BackSize1: number; LayPrice1: number; LaySize1: number; isSuspended: boolean }) =>
-                r.RunnerName === mapping.RunnerName
-            );
+  // const updateFancyOdds = useCallback(async () => {
+  //   if (!eventId || !marketId) return;
 
-            if (runner && mapping.back && mapping.lay) {
-              return {
-                ...mapping,
-                back: {
-                  ...mapping.back,
-                  price: runner.BackPrice1 || 0,
-                  size: runner.BackSize1 || 0,
-                  isSuspended: runner.isSuspended || false
-                },
-                lay: {
-                  ...mapping.lay,
-                  price: runner.LayPrice1 || 0,
-                  size: runner.LaySize1 || 0,
-                  isSuspended: runner.isSuspended || false
-                }
-              };
-            }
-            return mapping;
-          });
-          return newMappings;
-        });
-      }
-    } catch (error) {
-      console.error("Error updating fancy odds:", error);
-    }
-  }, [eventId, marketId]);
+  //   try {
+  //     const response = await fetch(
+  //       `https://book2500.funzip.in/api/fancy-odds`,
+  //       {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ event_id: eventId, market_id: marketId }),
+  //       }
+  //     );
+  //     const data = await response.json();
+  //     // console.log('+++++++++++++++',data)
+  //     if (data?.data) {
+  //       setFancyOddsMappings((prev) => {
+  //         const newMappings = prev.map((mapping) => {
+  //           const runner = data.data.find(
+  //             (r: { Match_id: string, RunnerName: string; BackPrice1: number; BackSize1: number; LayPrice1: number; LaySize1: number; isSuspended: boolean }) =>
+  //               r.RunnerName === mapping.RunnerName
+  //           );
+  //           // console.log('======mapping=====',runner.Match_id)
+  //           if (runner && mapping.back && mapping.lay) {
+  //             return {
+  //               ...mapping,
+  //               Match_id: runner.Match_id,
+  //               back: {
+  //                 ...mapping.back,
+  //                 price: runner.BackPrice1 || 0,
+  //                 size: runner.BackSize1 || 0,
+  //                 isSuspended: runner.isSuspended || false
+  //               },
+  //               lay: {
+  //                 ...mapping.lay,
+  //                 price: runner.LayPrice1 || 0,
+  //                 size: runner.LaySize1 || 0,
+  //                 isSuspended: runner.isSuspended || false
+  //               }
+  //             };
+  //           }
+  //           return mapping;
+  //         });
+  //         return newMappings;
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error("Error updating fancy odds:", error);
+  //   }
+  // }, [eventId, marketId]);
 
-  useEffect(() => {
-    let mounted = true;
+  // useEffect(() => {
+  //   let mounted = true;
 
-    const fetchAndUpdate = async () => {
-      if (mounted) {
-        await updateFancyOdds();
-      }
-    };
+  //   const fetchAndUpdate = async () => {
+  //     if (mounted) {
+  //       await updateFancyOdds();
+  //     }
+  //   };
 
-    fetchAndUpdate();
-    const interval = setInterval(fetchAndUpdate, 2500);
+  //   fetchAndUpdate();
+  //   const interval = setInterval(fetchAndUpdate, 2500);
 
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [updateFancyOdds]);
+  //   return () => {
+  //     mounted = false;
+  //     clearInterval(interval);
+  //   };
+  // }, [updateFancyOdds]);
 
   const fetchBookmakerMappings = useCallback(async () => {
     if (!eventId || !marketId) return;
@@ -951,7 +965,6 @@ export default function LiveMatch() {
         isback: selectedBet.type.toLowerCase() === "back" || selectedBet.type.toLowerCase() === "no" ? 1 : 0,
         level: 1
       };
-
       const response = await fetch(
         "https://book2500.funzip.in/api/prediction",
         {
@@ -1102,6 +1115,7 @@ export default function LiveMatch() {
 
   const handleFancyBet = (odd: GroupedFancyOdd, type: "no" | "yes") => {
     const option = type === "no" ? odd.back : odd.lay;
+    console.log('-------', type)
     if (!option) return;
     serIsBookMark(false)
     setSelectedBet({
@@ -1111,6 +1125,7 @@ export default function LiveMatch() {
       betoption_id: option.Option_id,
       betquestion_id: odd.Question_id,
       match_id: parseInt(odd.Match_id, 10),
+      selectionId: option.SelectionId
     });
 
     // Hardcode ratio to 2 for fancy bets
@@ -1344,9 +1359,9 @@ export default function LiveMatch() {
                         <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                           <span>{runner.runner}</span>
                           {/* Find the corresponding bet log entry for the current match */}
-                          {newBetlog.matches && (
+                          {newBetlog?.matches && (
                             () => {
-                              const currentMatchBetLog = newBetlog.matches.find(
+                              const currentMatchBetLog = newBetlog?.matches?.find(
                                 (log: any) => String(log.match_id) === runner.Match_id
                               );
 
@@ -1612,7 +1627,7 @@ export default function LiveMatch() {
                         <div className="flex flex-col items-end mr-4">
                           {/* Display mo_option value if available and not zero */}
                           {(() => {
-                            const currentMatchBetLog = newBetlog.matches.find(
+                            const currentMatchBetLog = newBetlog?.matches?.find(
                               (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                             );
 
