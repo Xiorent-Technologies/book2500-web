@@ -436,6 +436,25 @@ export default function LiveMatch() {
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
   const [newBetlog, setNewBetlog] = useState<any>([])
   // console.log('newBetlog', newBetlog)
+  const fetchcalculations = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      if (!token) {
+        toast.error("Please login to continue");
+        router.push("/login");
+        return;
+      }
+      const response = await fetch(`https://test.book2500.in/api/bet/bet-options/${eventId}/${marketId}`);
+    } catch (error) {
+      console.error("Error fetching bet history:", error);
+      // setBets([]);
+    } finally {
+      // setLoading(false);
+    }
+  }, [eventId, marketId, router]);
+
+  useEffect(() => { fetchcalculations() }, [fetchcalculations])
+
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -474,24 +493,7 @@ export default function LiveMatch() {
     return () => clearInterval(balanceInterval);
   }, []);
 
-  const fetchcalculations = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("auth_token");
-      if (!token) {
-        toast.error("Please login to continue");
-        router.push("/login");
-        return;
-      }
-      const response = await fetch(`https://test.book2500.in/api/bet/bet-options/${eventId}/${marketId}`);
-    } catch (error) {
-      console.error("Error fetching bet history:", error);
-      // setBets([]);
-    } finally {
-      // setLoading(false);
-    }
-  }, [eventId, marketId, router]);
 
-  useEffect(()=>{fetchcalculations()},[fetchcalculations])
 
   const fetchcalculation = useCallback(async () => {
     try {

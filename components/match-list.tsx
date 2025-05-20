@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tv } from "lucide-react";
 import Link from "next/link";
@@ -52,7 +52,15 @@ export function MatchList() {
   const [matches, setMatches] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const fetchcalculations = useCallback(async (eventId: string, marketId: string) => {
+    try {
+      await fetch(`https://test.book2500.in/api/bet/bet-options/${eventId}/${marketId}`);
+    } catch (error) {
+      console.error("Error fetching bet history:", error);
+    } finally {
+      // setLoading(false);
+    }
+  }, []);
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -156,6 +164,7 @@ export function MatchList() {
         <Link
           key={match.event.id}
           href={`/cricket/live?match=${match.event.id}&market=${match.marketIds[0]?.marketId}`}
+          onClick={() => { fetchcalculations(match.event.id, match.marketIds[0]?.marketId) }}
           className="block border-b border-purple-900 hover:bg-[#3a2255] transition-colors"
         >
           <div className="p-4">
@@ -195,9 +204,8 @@ export function MatchList() {
                   {Array(6).fill(null).map((_, index) => (
                     <div
                       key={index}
-                      className={`rounded py-4 text-center ${
-                        index % 2 === 0 ? "bg-[#72bbee]" : "bg-[#ff9393]"
-                      }`}
+                      className={`rounded py-4 text-center ${index % 2 === 0 ? "bg-[#72bbee]" : "bg-[#ff9393]"
+                        }`}
                     >
                       <div className="font-bold text-black">-</div>
                     </div>
@@ -205,16 +213,15 @@ export function MatchList() {
                 </div>
               ) : (
                 (() => {
-                  const odds : any= getFormattedOdds(match.odds.runners);
+                  const odds: any = getFormattedOdds(match.odds.runners);
                   if (!odds) return null;
 
-                  const isSuspended = Object.values(odds).every((odd:any) => odd === "-");
+                  const isSuspended = Object.values(odds).every((odd: any) => odd === "-");
 
                   return (
                     <div
-                      className={`grid grid-cols-6 gap-2 relative ${
-                        isSuspended ? "opacity-80" : ""
-                      }`}
+                      className={`grid grid-cols-6 gap-2 relative ${isSuspended ? "opacity-80" : ""
+                        }`}
                     >
                       <div className="bg-[#72bbee] rounded py-4 text-center">
                         <div className="font-bold text-black">
