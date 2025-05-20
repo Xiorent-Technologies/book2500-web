@@ -137,7 +137,7 @@ interface FancyOddsMapping {
   RunnerName: string;
   Match_id: string;
   Question_id: number;
-  rem:string;
+  rem: string;
   back?: {
     Option_id: number;
     Option_name: string;
@@ -435,7 +435,7 @@ export default function LiveMatch() {
   const [bookmakerMappings, setBookmakerMappings] = useState<BookmakerMapping[]>([]);
   const [isBookMarkBet, serIsBookMark] = useState<boolean>(false)
   const [newBetlog, setNewBetlog] = useState<any>([])
-  // console.log('newBetlog',newBetlog)
+  console.log('newBetlog', newBetlog)
   useEffect(() => {
     if (isBrowser) {
       const checkMobile = () => {
@@ -809,6 +809,7 @@ export default function LiveMatch() {
       );
 
       const data = await response.json();
+      console.log('===>', data)
       if (data?.data) {
         setBookmakerMappings(data.data);
       }
@@ -1522,31 +1523,31 @@ export default function LiveMatch() {
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[0].runnerName}</span>
                         {/* Show only bookmaker data */}
-                        <div className="flex flex-col items-end mr-4">
-                          {/* Display option_1 value if available and not zero */}
-                          {(() => {
-                            const currentMatchBetLog = newBetlog.matches.find(
-                              (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
-                            );
-
-                            if (currentMatchBetLog && currentMatchBetLog.option_1 !== null && currentMatchBetLog.option_1 !== 0) {
-                              return (
-                                <div className="flex flex-col items-end">
-                                  <span
-                                    className={`${currentMatchBetLog.option_1 > 0 ? "text-green-400" : "text-red-400"
-                                      }`}
-                                  >
-                                    {currentMatchBetLog.option_1 > 0 ? "+" : "-"}₹
-                                    {Math.abs(currentMatchBetLog.option_1)}
-                                  </span>
-                                </div>
+                        {bookmakerMappings[0].Match_id && newBetlog?.matches ? (
+                          <div className="flex flex-col items-end mr-4">
+                            {/* Display option_1 value if available and not zero */}
+                            {(() => {
+                              const currentMatchBetLog = newBetlog?.matches?.find(
+                                (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                               );
-                            }
+                              if (currentMatchBetLog && currentMatchBetLog.option_1 !== null && currentMatchBetLog.option_1 !== 0) {
+                                return (
+                                  <div className="flex flex-col items-end">
+                                    <span
+                                      className={`${currentMatchBetLog.option_1 > 0 ? "text-green-400" : "text-red-400"
+                                        }`}
+                                    >
+                                      {currentMatchBetLog.option_1 > 0 ? "+" : "-"}₹
+                                      {Math.abs(currentMatchBetLog.option_1)}
+                                    </span>
+                                  </div>
+                                );
+                              }
 
-                            return null;
-                          })()}
-                        </div>
-
+                              return null;
+                            })()}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="grid grid-cols-6 w-full relative">
@@ -1622,30 +1623,33 @@ export default function LiveMatch() {
                       <div className="text-white font-bold pl-4 py-2 bg-[#231439] flex justify-between items-center">
                         <span>{bookmakerMarket.runners[1].runnerName}</span>
                         {/* Show only bookmaker data */}
-                        <div className="flex flex-col items-end mr-4">
-                          {/* Display mo_option value if available and not zero */}
-                          {(() => {
-                            const currentMatchBetLog = newBetlog?.matches?.find(
-                              (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
-                            );
-
-                            if (currentMatchBetLog && currentMatchBetLog.option_2 !== null && currentMatchBetLog.option_2 !== 0) {
-                              return (
-                                <div className="flex flex-col items-end">
-                                  <span
-                                    className={`${currentMatchBetLog.option_2 > 0 ? "text-green-400" : "text-red-400"
-                                      }`}
-                                  >
-                                    {currentMatchBetLog.option_2 > 0 ? "+" : "-"}₹
-                                    {Math.abs(currentMatchBetLog.option_2)}
-                                  </span>
-                                </div>
+                        {newBetlog?.matches && bookmakerMappings?.[0]?.Match_id && (
+                          <div className="flex flex-col items-end mr-4">
+                            {/* Display mo_option value if available and not zero */}
+                            {(() => {
+                              const currentMatchBetLog = newBetlog.matches.find(
+                                (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                               );
-                            }
 
-                            return null;
-                          })()}
-                        </div>
+                              if (currentMatchBetLog && currentMatchBetLog.option_2 !== null && currentMatchBetLog.option_2 !== 0) {
+                                return (
+                                  <div className="flex flex-col items-end">
+                                    <span
+                                      className={`${currentMatchBetLog.option_2 > 0 ? "text-green-400" : "text-red-400"
+                                        }`}
+                                    >
+                                      {currentMatchBetLog.option_2 > 0 ? "+" : "-"}₹
+                                      {Math.abs(currentMatchBetLog.option_2)}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              return null;
+                            })()}
+                          </div>
+                        )}
+
                       </div>
                       <div className="grid grid-cols-6 w-full relative">
                         {bookmakerMarket.runners[1].status === "SUSPENDED" && (
