@@ -1368,7 +1368,7 @@ export default function LiveMatch() {
                                 let optionValue = null;
                                 if (String(runner.selectionId) === currentMatchBetLog.selection_id_1) {
                                   optionValue = Number(currentMatchBetLog.mo_option_1);
-                                } else if (String(runner.selectionId) === currentMatchBetLog.selection_id_2) {
+                                } else {
                                   optionValue = Number(currentMatchBetLog.mo_option_2);
                                 }
 
@@ -1530,7 +1530,7 @@ export default function LiveMatch() {
                               const currentMatchBetLog = newBetlog?.matches?.find(
                                 (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                               );
-                              if (currentMatchBetLog && currentMatchBetLog.option_1 !== null && currentMatchBetLog.option_1 !== 0) {
+                              if (currentMatchBetLog && currentMatchBetLog.option_1 !== null && currentMatchBetLog.option_1 !== '0') {
                                 return (
                                   <div className="flex flex-col items-end">
                                     <span
@@ -1631,7 +1631,7 @@ export default function LiveMatch() {
                                 (log: any) => String(log.match_id) === String(bookmakerMappings[0].Match_id)
                               );
 
-                              if (currentMatchBetLog && currentMatchBetLog.option_2 !== null && currentMatchBetLog.option_2 !== 0) {
+                              if (currentMatchBetLog && currentMatchBetLog.option_2 !== null && currentMatchBetLog.option_2 !== '0') {
                                 return (
                                   <div className="flex flex-col items-end">
                                     <span
