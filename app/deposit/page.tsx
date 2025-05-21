@@ -5,6 +5,7 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { FaWhatsapp } from 'react-icons/fa';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -255,35 +256,43 @@ const [userData, setUserData] = useState<UserData | null>(null);
                         onClick={() => setSelectedGateway(gateway.id)}
                       >
                         <CardContent className="p-4">
-                          <div className="flex items-center gap-4">
-                            {gateway.image_url && (
-                              <div className="relative w-12 h-12 flex-shrink-0">
-                                <Image
-                                  src={gateway.image_url || "/placeholder.svg"}
-                                  alt={gateway.name}
-                                  fill
-                                  className="object-contain rounded"
-                                />
-                              </div>
-                            )}
-                            <div>
-                              <div className="text-white text-sm font-medium">
-                                {gateway.name}
-                              </div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                Min: ₹{gateway.minimum_deposit_amount} - Max: ₹
-                                {gateway.maximum_deposit_amount}
-                              </div>
-                              {gateway.account_detais && (
-                                <div className="text-xs text-gray-400 mt-1">
-                                  UPI ID: {gateway.account_detais}
-                                </div>
-                              )}
-                              <div className="text-xs text-gray-400 mt-1">
-                                Mobile: 9352415245
-                              </div>
-                            </div>
-                          </div>
+                          <div className="flex items-start gap-6 p-4 bg-gray-800 rounded-lg">
+  {gateway.image_url && (
+    <div className="relative w-16 h-16 flex-shrink-0">
+      <Image
+        src={gateway.image_url || "/placeholder.svg"}
+        alt={gateway.name}
+        fill
+        className="object-contain rounded"
+      />
+    </div>
+  )}
+  <div className="flex flex-col">
+    <div className="text-white text-lg font-semibold">
+      {gateway.name}
+    </div>
+    <div className="text-base text-gray-300 mt-2">
+      Min: ₹{gateway.minimum_deposit_amount} - Max: ₹{gateway.maximum_deposit_amount}
+    </div>
+    {gateway.account_detais && (
+      <div className="text-base text-gray-300 mt-1">
+        UPI ID: {gateway.account_detais}
+      </div>
+    )}
+    <div className="text-lg text-gray-300 mt-3 flex items-center gap-3">
+      <FaWhatsapp className="text-green-500 text-3xl" />
+      <a
+        href="https://wa.me/9352415245"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat on WhatsApp"
+        className="hover:underline"
+      >
+        Chat on WhatsApp
+      </a>
+    </div>
+  </div>
+</div>
                         </CardContent>
                       </Card>
                     ))}
